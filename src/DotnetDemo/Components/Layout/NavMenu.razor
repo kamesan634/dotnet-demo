@@ -1,0 +1,50 @@
+@using Microsoft.AspNetCore.Components.Authorization
+
+<MudNavMenu>
+    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">儀表板</MudNavLink>
+
+    <MudNavGroup Title="基礎資料" Icon="@Icons.Material.Filled.Folder" Expanded="false">
+        <MudNavLink Href="/products" Icon="@Icons.Material.Filled.Inventory">商品管理</MudNavLink>
+        <MudNavLink Href="/categories" Icon="@Icons.Material.Filled.Category">分類管理</MudNavLink>
+        <MudNavLink Href="/suppliers" Icon="@Icons.Material.Filled.LocalShipping">供應商管理</MudNavLink>
+        <MudNavLink Href="/customers" Icon="@Icons.Material.Filled.People">客戶管理</MudNavLink>
+        <MudNavLink Href="/units" Icon="@Icons.Material.Filled.Straighten">單位管理</MudNavLink>
+        <MudNavLink Href="/payment-methods" Icon="@Icons.Material.Filled.Payment">付款方式</MudNavLink>
+        <MudNavLink Href="/warehouses" Icon="@Icons.Material.Filled.Warehouse">倉庫管理</MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="銷售管理" Icon="@Icons.Material.Filled.ShoppingCart" Expanded="false">
+        <MudNavLink Href="/pos" Icon="@Icons.Material.Filled.PointOfSale">POS 銷售</MudNavLink>
+        <MudNavLink Href="/orders" Icon="@Icons.Material.Filled.Receipt">訂單查詢</MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="庫存管理" Icon="@Icons.Material.Filled.Inventory2" Expanded="false">
+        <MudNavLink Href="/inventory" Icon="@Icons.Material.Filled.Search">庫存查詢</MudNavLink>
+        <MudNavLink Href="/stock-transfers" Icon="@Icons.Material.Filled.SwapHoriz">庫存調撥</MudNavLink>
+        <MudNavLink Href="/stock-adjustments" Icon="@Icons.Material.Filled.Tune">庫存調整</MudNavLink>
+        <MudNavLink Href="/low-stock-alerts" Icon="@Icons.Material.Filled.Warning">庫存警示</MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="採購管理" Icon="@Icons.Material.Filled.ShoppingBasket" Expanded="false">
+        <MudNavLink Href="/purchase-orders" Icon="@Icons.Material.Filled.Description">採購單管理</MudNavLink>
+        <MudNavLink Href="/purchase-receipts" Icon="@Icons.Material.Filled.MoveToInbox">進貨單管理</MudNavLink>
+        <MudNavLink Href="/purchase-suggestions" Icon="@Icons.Material.Filled.Recommend">採購建議</MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="報表分析" Icon="@Icons.Material.Filled.BarChart" Expanded="false">
+        <MudNavLink Href="/reports/sales" Icon="@Icons.Material.Filled.TrendingUp">銷售報表</MudNavLink>
+        <MudNavLink Href="/reports/inventory" Icon="@Icons.Material.Filled.Assessment">庫存報表</MudNavLink>
+        <MudNavLink Href="/reports/purchasing" Icon="@Icons.Material.Filled.Analytics">採購報表</MudNavLink>
+    </MudNavGroup>
+
+    <AuthorizeView Roles="Admin">
+        <Authorized>
+            <MudNavGroup Title="系統管理" Icon="@Icons.Material.Filled.Settings" Expanded="false">
+                <MudNavLink Href="/users" Icon="@Icons.Material.Filled.ManageAccounts">使用者管理</MudNavLink>
+                <MudNavLink Href="/roles" Icon="@Icons.Material.Filled.Security">角色管理</MudNavLink>
+                <MudNavLink Href="/stores" Icon="@Icons.Material.Filled.Store">門市管理</MudNavLink>
+                <MudNavLink Href="/audit-logs" Icon="@Icons.Material.Filled.History">操作紀錄</MudNavLink>
+            </MudNavGroup>
+        </Authorized>
+    </AuthorizeView>
+</MudNavMenu>

@@ -1,0 +1,116 @@
+@page "/suppliers"
+@attribute [Authorize]
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>供應商管理 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">供應商管理</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">供應商列表</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAddDialog">新增供應商</MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_suppliers" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>代碼</MudTh>
+                <MudTh>名稱</MudTh>
+                <MudTh>聯絡人</MudTh>
+                <MudTh>電話</MudTh>
+                <MudTh>統編</MudTh>
+                <MudTh>付款條件</MudTh>
+                <MudTh>狀態</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="代碼">@context.Code</MudTd>
+                <MudTd DataLabel="名稱">@context.Name</MudTd>
+                <MudTd DataLabel="聯絡人">@context.ContactName</MudTd>
+                <MudTd DataLabel="電話">@context.Phone</MudTd>
+                <MudTd DataLabel="統編">@context.TaxId</MudTd>
+                <MudTd DataLabel="付款條件">@context.PaymentTermDays 天</MudTd>
+                <MudTd DataLabel="狀態">
+                    <MudChip Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Default)">
+                        @(context.IsActive ? "啟用" : "停用")
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="操作">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => OpenEditDialog(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="@(() => DeleteSupplier(context))" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<Supplier> _suppliers = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        _suppliers = await DbContext.Suppliers.OrderBy(s => s.Code).ToListAsync();
+        _loading = false;
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var parameters = new DialogParameters { ["Supplier"] = new Supplier(), ["IsNew"] = true };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<SupplierDialog>("新增供應商", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadDataAsync();
+            Snackbar.Add("供應商新增成功", Severity.Success);
+        }
+    }
+
+    private async Task OpenEditDialog(Supplier supplier)
+    {
+        var parameters = new DialogParameters { ["Supplier"] = supplier, ["IsNew"] = false };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<SupplierDialog>("編輯供應商", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadDataAsync();
+            Snackbar.Add("供應商更新成功", Severity.Success);
+        }
+    }
+
+    private async Task DeleteSupplier(Supplier supplier)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "確認刪除", $"確定要刪除供應商「{supplier.Name}」嗎？",
+            yesText: "刪除", cancelText: "取消");
+
+        if (result == true)
+        {
+            DbContext.Suppliers.Remove(supplier);
+            await DbContext.SaveChangesAsync();
+            await LoadDataAsync();
+            Snackbar.Add("供應商已刪除", Severity.Success);
+        }
+    }
+}

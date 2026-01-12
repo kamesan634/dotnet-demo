@@ -1,0 +1,121 @@
+@page "/customers"
+@attribute [Authorize]
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>客戶管理 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">客戶管理</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">客戶列表</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAddDialog">新增客戶</MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_customers" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>會員卡號</MudTh>
+                <MudTh>姓名</MudTh>
+                <MudTh>電話</MudTh>
+                <MudTh>會員等級</MudTh>
+                <MudTh>累積點數</MudTh>
+                <MudTh>累積消費</MudTh>
+                <MudTh>狀態</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="會員卡號">@context.Code</MudTd>
+                <MudTd DataLabel="姓名">@context.Name</MudTd>
+                <MudTd DataLabel="電話">@context.Phone</MudTd>
+                <MudTd DataLabel="會員等級">
+                    <MudChip Size="Size.Small" Color="Color.Primary">@context.CustomerLevel?.Name</MudChip>
+                </MudTd>
+                <MudTd DataLabel="累積點數">@context.Points.ToString("N0")</MudTd>
+                <MudTd DataLabel="累積消費">@context.TotalSpent.ToString("C0")</MudTd>
+                <MudTd DataLabel="狀態">
+                    <MudChip Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Default)">
+                        @(context.IsActive ? "啟用" : "停用")
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="操作">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => OpenEditDialog(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="@(() => DeleteCustomer(context))" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<Customer> _customers = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        _customers = await DbContext.Customers
+            .Include(c => c.CustomerLevel)
+            .OrderBy(c => c.Code)
+            .ToListAsync();
+        _loading = false;
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var parameters = new DialogParameters { ["Customer"] = new Customer(), ["IsNew"] = true };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<CustomerDialog>("新增客戶", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadDataAsync();
+            Snackbar.Add("客戶新增成功", Severity.Success);
+        }
+    }
+
+    private async Task OpenEditDialog(Customer customer)
+    {
+        var parameters = new DialogParameters { ["Customer"] = customer, ["IsNew"] = false };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<CustomerDialog>("編輯客戶", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadDataAsync();
+            Snackbar.Add("客戶更新成功", Severity.Success);
+        }
+    }
+
+    private async Task DeleteCustomer(Customer customer)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "確認刪除", $"確定要刪除客戶「{customer.Name}」嗎？",
+            yesText: "刪除", cancelText: "取消");
+
+        if (result == true)
+        {
+            DbContext.Customers.Remove(customer);
+            await DbContext.SaveChangesAsync();
+            await LoadDataAsync();
+            Snackbar.Add("客戶已刪除", Severity.Success);
+        }
+    }
+}

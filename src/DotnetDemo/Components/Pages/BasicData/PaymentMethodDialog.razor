@@ -1,0 +1,56 @@
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+
+<MudDialog>
+    <DialogContent>
+        <EditForm Model="@PaymentMethod">
+            <DataAnnotationsValidator />
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="PaymentMethod.Code" Label="付款方式代碼" Required="true" Disabled="@(!IsNew)" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="PaymentMethod.Name" Label="付款方式名稱" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="PaymentMethod.SortOrder" Label="排序" Min="0" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSwitch T="bool" @bind-Value="PaymentMethod.RequiresChange" Label="需找零" Color="Color.Info" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSwitch T="bool" @bind-Value="PaymentMethod.IsActive" Label="啟用" Color="Color.Primary" />
+                </MudItem>
+            </MudGrid>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">儲存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public PaymentMethod PaymentMethod { get; set; } = new();
+    [Parameter] public bool IsNew { get; set; }
+
+    private async Task SaveAsync()
+    {
+        if (IsNew)
+        {
+            PaymentMethod.CreatedAt = DateTime.UtcNow;
+            DbContext.PaymentMethods.Add(PaymentMethod);
+        }
+        else
+        {
+            DbContext.PaymentMethods.Update(PaymentMethod);
+        }
+
+        await DbContext.SaveChangesAsync();
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

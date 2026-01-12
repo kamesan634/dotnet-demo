@@ -1,0 +1,92 @@
+@page "/low-stock-alerts"
+@attribute [Authorize]
+@using DotnetDemo.Services.Interfaces
+@inject IReportService ReportService
+
+<PageTitle>庫存警示 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">庫存警示</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">低庫存商品</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
+                       OnClick="LoadDataAsync">重新整理</MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_lowStockItems" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>商品代碼</MudTh>
+                <MudTh>商品名稱</MudTh>
+                <MudTh>倉庫</MudTh>
+                <MudTh>現有庫存</MudTh>
+                <MudTh>安全庫存</MudTh>
+                <MudTh>差額</MudTh>
+                <MudTh>警示等級</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.ProductCode</MudTd>
+                <MudTd>@context.ProductName</MudTd>
+                <MudTd>@context.WarehouseName</MudTd>
+                <MudTd>@context.Quantity</MudTd>
+                <MudTd>@context.SafetyStock</MudTd>
+                <MudTd>
+                    <MudText Color="Color.Error">@(context.Quantity - context.SafetyStock)</MudText>
+                </MudTd>
+                <MudTd>
+                    <MudChip Size="Size.Small" Color="@GetAlertColor(context.Quantity, context.SafetyStock)">
+                        @GetAlertLevel(context.Quantity, context.SafetyStock)
+                    </MudChip>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudAlert Severity="Severity.Success">目前沒有庫存警示</MudAlert>
+            </NoRecordsContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<InventoryReport> _lowStockItems = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        _lowStockItems = await ReportService.GetInventoryReportAsync(null, lowStockOnly: true);
+        _loading = false;
+    }
+
+    private Color GetAlertColor(int quantity, int safetyStock)
+    {
+        if (safetyStock == 0) return Color.Info;
+        var ratio = (double)quantity / safetyStock;
+        return ratio switch
+        {
+            <= 0.25 => Color.Error,
+            <= 0.5 => Color.Warning,
+            _ => Color.Info
+        };
+    }
+
+    private string GetAlertLevel(int quantity, int safetyStock)
+    {
+        if (safetyStock == 0) return "注意";
+        var ratio = (double)quantity / safetyStock;
+        return ratio switch
+        {
+            <= 0.25 => "嚴重",
+            <= 0.5 => "警告",
+            _ => "注意"
+        };
+    }
+}

@@ -1,0 +1,212 @@
+@page "/pos"
+@attribute [Authorize]
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+@inject ISnackbar Snackbar
+
+<PageTitle>POS 銷售 - 零售管理系統</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12" md="8">
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">商品搜尋</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudAutocomplete T="Product" Label="搜尋商品 (名稱/條碼)" @bind-Value="_selectedProduct"
+                                 SearchFunc="SearchProducts" ToStringFunc="@(p => p?.Name ?? "")"
+                                 Variant="Variant.Outlined" Clearable="true"
+                                 AdornmentIcon="@Icons.Material.Filled.Search" AdornmentColor="Color.Primary" />
+
+                @if (_selectedProduct != null)
+                {
+                    <MudGrid Class="mt-4">
+                        <MudItem xs="6">
+                            <MudNumericField @bind-Value="_quantity" Label="數量" Min="1" Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                                       OnClick="AddToCart" Class="mt-2" Size="Size.Large">
+                                加入購物車
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                }
+
+                <MudDivider Class="my-4" />
+
+                <MudTable Items="@_cartItems" Dense="true" Hover="true">
+                    <HeaderContent>
+                        <MudTh>商品</MudTh>
+                        <MudTh>單價</MudTh>
+                        <MudTh>數量</MudTh>
+                        <MudTh>小計</MudTh>
+                        <MudTh></MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.ProductName</MudTd>
+                        <MudTd>@context.UnitPrice.ToString("N0")</MudTd>
+                        <MudTd>@context.Quantity</MudTd>
+                        <MudTd>@context.Subtotal.ToString("N0")</MudTd>
+                        <MudTd>
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                           OnClick="@(() => RemoveFromCart(context))" />
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" md="4">
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">結帳</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText Typo="Typo.h3" Align="Align.Center" Color="Color.Primary" Class="mb-4">
+                    $@_cartItems.Sum(x => x.Subtotal).ToString("N0")
+                </MudText>
+
+                <MudSelect T="int?" @bind-Value="_selectedCustomerId" Label="會員" Clearable="true" Variant="Variant.Outlined" Class="mb-4">
+                    @foreach (var customer in _customers)
+                    {
+                        <MudSelectItem Value="@((int?)customer.Id)">@customer.Name (@customer.Phone)</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudSelect T="int" @bind-Value="_selectedPaymentMethodId" Label="付款方式" Variant="Variant.Outlined" Class="mb-4">
+                    @foreach (var pm in _paymentMethods)
+                    {
+                        <MudSelectItem Value="@pm.Id">@pm.Name</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudButton Variant="Variant.Filled" Color="Color.Success" FullWidth="true" Size="Size.Large"
+                           OnClick="Checkout" Disabled="@(!_cartItems.Any())">
+                    <MudIcon Icon="@Icons.Material.Filled.ShoppingCartCheckout" Class="mr-2" />
+                    結帳
+                </MudButton>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private Product? _selectedProduct;
+    private int _quantity = 1;
+    private List<CartItem> _cartItems = new();
+    private List<Customer> _customers = new();
+    private List<PaymentMethod> _paymentMethods = new();
+    private int? _selectedCustomerId;
+    private int _selectedPaymentMethodId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _customers = await DbContext.Customers.Where(c => c.IsActive).OrderBy(c => c.Name).ToListAsync();
+        _paymentMethods = await DbContext.PaymentMethods.Where(p => p.IsActive).OrderBy(p => p.SortOrder).ToListAsync();
+        if (_paymentMethods.Any())
+        {
+            _selectedPaymentMethodId = _paymentMethods.First().Id;
+        }
+    }
+
+    private async Task<IEnumerable<Product>> SearchProducts(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return Enumerable.Empty<Product>();
+
+        return await DbContext.Products
+            .Where(p => p.IsActive && (p.Name.Contains(value) || p.Barcode!.Contains(value)))
+            .Take(10)
+            .ToListAsync();
+    }
+
+    private void AddToCart()
+    {
+        if (_selectedProduct == null) return;
+
+        var existing = _cartItems.FirstOrDefault(x => x.ProductId == _selectedProduct.Id);
+        if (existing != null)
+        {
+            existing.Quantity += _quantity;
+        }
+        else
+        {
+            _cartItems.Add(new CartItem
+            {
+                ProductId = _selectedProduct.Id,
+                ProductName = _selectedProduct.Name,
+                UnitPrice = _selectedProduct.SellingPrice,
+                Quantity = _quantity
+            });
+        }
+
+        _selectedProduct = null;
+        _quantity = 1;
+    }
+
+    private void RemoveFromCart(CartItem item)
+    {
+        _cartItems.Remove(item);
+    }
+
+    private async Task Checkout()
+    {
+        if (!_cartItems.Any())
+        {
+            Snackbar.Add("購物車是空的", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            var order = new Order
+            {
+                OrderNumber = $"POS{DateTime.Now:yyyyMMddHHmmss}",
+                CustomerId = _selectedCustomerId,
+                TotalAmount = _cartItems.Sum(x => x.Subtotal),
+                Status = OrderStatus.Completed,
+                Items = _cartItems.Select(x => new OrderItem
+                {
+                    ProductId = x.ProductId,
+                    Quantity = x.Quantity,
+                    UnitPrice = x.UnitPrice
+                }).ToList(),
+                Payments = new List<OrderPayment>
+                {
+                    new OrderPayment
+                    {
+                        PaymentMethodId = _selectedPaymentMethodId,
+                        Amount = _cartItems.Sum(x => x.Subtotal)
+                    }
+                }
+            };
+
+            DbContext.Orders.Add(order);
+            await DbContext.SaveChangesAsync();
+
+            _cartItems.Clear();
+            _selectedCustomerId = null;
+            Snackbar.Add("結帳成功！", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"結帳失敗：{ex.Message}", Severity.Error);
+        }
+    }
+
+    private class CartItem
+    {
+        public int ProductId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public decimal UnitPrice { get; set; }
+        public int Quantity { get; set; }
+        public decimal Subtotal => UnitPrice * Quantity;
+    }
+}

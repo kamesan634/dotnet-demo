@@ -1,0 +1,158 @@
+@page "/orders"
+@attribute [Authorize]
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+@inject IDialogService DialogService
+
+<PageTitle>訂單查詢 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">訂單查詢</MudText>
+
+<MudCard Class="mb-4">
+    <MudCardContent>
+        <MudGrid>
+            <MudItem xs="12" sm="3">
+                <MudTextField @bind-Value="_searchText" Label="訂單編號" Placeholder="輸入訂單編號"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
+            </MudItem>
+            <MudItem xs="12" sm="2">
+                <MudSelect T="OrderStatus?" @bind-Value="_selectedStatus" Label="狀態" Clearable="true">
+                    <MudSelectItem Value="@((OrderStatus?)OrderStatus.Pending)">待處理</MudSelectItem>
+                    <MudSelectItem Value="@((OrderStatus?)OrderStatus.Confirmed)">已確認</MudSelectItem>
+                    <MudSelectItem Value="@((OrderStatus?)OrderStatus.Completed)">已完成</MudSelectItem>
+                    <MudSelectItem Value="@((OrderStatus?)OrderStatus.Cancelled)">已取消</MudSelectItem>
+                    <MudSelectItem Value="@((OrderStatus?)OrderStatus.Refunded)">已退貨</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudDateRangePicker @bind-DateRange="_dateRange" Label="日期範圍" />
+            </MudItem>
+            <MudItem xs="12" sm="2" Class="d-flex align-end">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SearchAsync">搜尋</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudCardContent>
+</MudCard>
+
+<MudCard>
+    <MudCardContent>
+        <MudTable Items="@_orders" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>訂單編號</MudTh>
+                <MudTh>客戶</MudTh>
+                <MudTh>金額</MudTh>
+                <MudTh>狀態</MudTh>
+                <MudTh>建立時間</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="訂單編號">@context.OrderNumber</MudTd>
+                <MudTd DataLabel="客戶">@(context.Customer?.Name ?? "散客")</MudTd>
+                <MudTd DataLabel="金額">@context.TotalAmount.ToString("C0")</MudTd>
+                <MudTd DataLabel="狀態">
+                    <MudChip Size="Size.Small" Color="@GetStatusColor(context.Status)">
+                        @GetStatusText(context.Status)
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="建立時間">@context.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</MudTd>
+                <MudTd DataLabel="操作">
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => ViewOrder(context))" />
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+            </PagerContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<Order> _orders = new();
+    private bool _loading = true;
+    private string? _searchText;
+    private OrderStatus? _selectedStatus;
+    private DateRange? _dateRange;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        _loading = true;
+        try
+        {
+            var query = DbContext.Orders
+                .Include(o => o.Customer)
+                .Include(o => o.Store)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(_searchText))
+            {
+                query = query.Where(o => o.OrderNumber.Contains(_searchText));
+            }
+
+            if (_selectedStatus.HasValue)
+            {
+                query = query.Where(o => o.Status == _selectedStatus.Value);
+            }
+
+            if (_dateRange?.Start.HasValue == true)
+            {
+                var start = _dateRange.Start.Value.ToUniversalTime();
+                query = query.Where(o => o.CreatedAt >= start);
+            }
+
+            if (_dateRange?.End.HasValue == true)
+            {
+                var end = _dateRange.End.Value.AddDays(1).ToUniversalTime();
+                query = query.Where(o => o.CreatedAt < end);
+            }
+
+            _orders = await query.OrderByDescending(o => o.CreatedAt).Take(100).ToListAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ViewOrder(Order order)
+    {
+        var orderWithItems = await DbContext.Orders
+            .Include(o => o.Items).ThenInclude(i => i.Product)
+            .Include(o => o.Payments).ThenInclude(p => p.PaymentMethod)
+            .Include(o => o.Customer)
+            .FirstOrDefaultAsync(o => o.Id == order.Id);
+
+        if (orderWithItems != null)
+        {
+            var parameters = new DialogParameters { ["Order"] = orderWithItems };
+            var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+            await DialogService.ShowAsync<OrderDetailDialog>("訂單詳情", parameters, options);
+        }
+    }
+
+    private Color GetStatusColor(OrderStatus status) => status switch
+    {
+        OrderStatus.Completed => Color.Success,
+        OrderStatus.Pending => Color.Warning,
+        OrderStatus.Confirmed => Color.Info,
+        OrderStatus.Cancelled => Color.Error,
+        OrderStatus.Refunded => Color.Secondary,
+        _ => Color.Default
+    };
+
+    private string GetStatusText(OrderStatus status) => status switch
+    {
+        OrderStatus.Pending => "待處理",
+        OrderStatus.Confirmed => "已確認",
+        OrderStatus.Completed => "已完成",
+        OrderStatus.Cancelled => "已取消",
+        OrderStatus.Refunded => "已退貨",
+        _ => status.ToString()
+    };
+}

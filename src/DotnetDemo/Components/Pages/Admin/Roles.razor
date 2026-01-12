@@ -1,0 +1,77 @@
+@page "/roles"
+@attribute [Authorize(Roles = "Admin")]
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+@inject RoleManager<ApplicationRole> RoleManager
+@inject ISnackbar Snackbar
+
+<PageTitle>角色管理 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">角色管理</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">角色列表</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">
+                新增角色
+            </MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_roles" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>角色名稱</MudTh>
+                <MudTh>說明</MudTh>
+                <MudTh>使用者數</MudTh>
+                <MudTh>建立時間</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Name</MudTd>
+                <MudTd>@context.Description</MudTd>
+                <MudTd>@context.UserCount</MudTd>
+                <MudTd>@context.CreatedAt.ToString("yyyy-MM-dd")</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Security" Size="Size.Small" Color="Color.Info" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<RoleViewModel> _roles = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+
+        var roles = await DbContext.Roles.ToListAsync();
+        var userRoles = await DbContext.UserRoles.ToListAsync();
+
+        _roles = roles.Select(r => new RoleViewModel
+        {
+            Name = r.Name ?? "",
+            Description = r.Description,
+            CreatedAt = r.CreatedAt,
+            UserCount = userRoles.Count(ur => ur.RoleId == r.Id)
+        }).ToList();
+
+        _loading = false;
+    }
+
+    private class RoleViewModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public int UserCount { get; set; }
+    }
+}

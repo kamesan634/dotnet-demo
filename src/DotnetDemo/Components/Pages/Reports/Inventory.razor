@@ -1,0 +1,77 @@
+@page "/reports/inventory"
+@attribute [Authorize]
+@using DotnetDemo.Services.Interfaces
+@inject IReportService ReportService
+
+<PageTitle>庫存報表 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">庫存報表</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">庫存清單</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudSwitch T="bool" @bind-Value="_lowStockOnly" Label="僅顯示低庫存" Color="Color.Warning" />
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadDataAsync"
+                       StartIcon="@Icons.Material.Filled.Refresh" Class="ml-2">重新整理</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Class="ml-2"
+                       StartIcon="@Icons.Material.Filled.Download">匯出 Excel</MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_inventoryReport" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>商品代碼</MudTh>
+                <MudTh>商品名稱</MudTh>
+                <MudTh>倉庫</MudTh>
+                <MudTh>數量</MudTh>
+                <MudTh>安全庫存</MudTh>
+                <MudTh>庫存價值</MudTh>
+                <MudTh>狀態</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.ProductCode</MudTd>
+                <MudTd>@context.ProductName</MudTd>
+                <MudTd>@context.WarehouseName</MudTd>
+                <MudTd>@context.Quantity</MudTd>
+                <MudTd>@context.SafetyStock</MudTd>
+                <MudTd>$@context.StockValue.ToString("N0")</MudTd>
+                <MudTd>
+                    @if (context.IsLowStock)
+                    {
+                        <MudChip Size="Size.Small" Color="Color.Warning">低庫存</MudChip>
+                    }
+                    else
+                    {
+                        <MudChip Size="Size.Small" Color="Color.Success">正常</MudChip>
+                    }
+                </MudTd>
+            </RowTemplate>
+            <FooterContent>
+                <MudTd colspan="5"><strong>總計</strong></MudTd>
+                <MudTd><strong>$@_inventoryReport.Sum(x => x.StockValue).ToString("N0")</strong></MudTd>
+                <MudTd></MudTd>
+            </FooterContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<InventoryReport> _inventoryReport = new();
+    private bool _loading = true;
+    private bool _lowStockOnly = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        _inventoryReport = await ReportService.GetInventoryReportAsync(null, _lowStockOnly);
+        _loading = false;
+    }
+}

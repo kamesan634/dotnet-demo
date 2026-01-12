@@ -1,0 +1,78 @@
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+
+<MudDialog>
+    <DialogContent>
+        <EditForm Model="@Warehouse">
+            <DataAnnotationsValidator />
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Warehouse.Code" Label="倉庫代碼" Required="true" Disabled="@(!IsNew)" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Warehouse.Name" Label="倉庫名稱" Required="true" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSelect T="int?" @bind-Value="Warehouse.StoreId" Label="所屬門市" Clearable="true">
+                        @foreach (var store in _stores)
+                        {
+                            <MudSelectItem Value="@((int?)store.Id)">@store.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Warehouse.Address" Label="地址" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Warehouse.ContactName" Label="聯絡人" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Warehouse.Phone" Label="電話" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSwitch T="bool" @bind-Value="Warehouse.IsPrimary" Label="主倉庫" Color="Color.Warning" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSwitch T="bool" @bind-Value="Warehouse.IsActive" Label="啟用" Color="Color.Primary" />
+                </MudItem>
+            </MudGrid>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">儲存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public Warehouse Warehouse { get; set; } = new();
+    [Parameter] public bool IsNew { get; set; }
+
+    private List<Store> _stores = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _stores = await DbContext.Stores.Where(s => s.IsActive).OrderBy(s => s.Name).ToListAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        if (IsNew)
+        {
+            Warehouse.CreatedAt = DateTime.UtcNow;
+            DbContext.Warehouses.Add(Warehouse);
+        }
+        else
+        {
+            Warehouse.UpdatedAt = DateTime.UtcNow;
+            DbContext.Warehouses.Update(Warehouse);
+        }
+
+        await DbContext.SaveChangesAsync();
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

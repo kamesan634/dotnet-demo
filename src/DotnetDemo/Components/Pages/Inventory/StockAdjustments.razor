@@ -1,0 +1,61 @@
+@page "/stock-adjustments"
+@attribute [Authorize]
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+@inject ISnackbar Snackbar
+
+<PageTitle>庫存調整 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">庫存調整</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">調整單列表</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">
+                新增調整單
+            </MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_adjustments" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>調整單號</MudTh>
+                <MudTh>倉庫</MudTh>
+                <MudTh>原因</MudTh>
+                <MudTh>建立時間</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.AdjustmentNumber</MudTd>
+                <MudTd>@context.Warehouse?.Name</MudTd>
+                <MudTd>@context.Reason</MudTd>
+                <MudTd>@context.CreatedAt.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary" />
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText>尚無調整單資料</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<StockAdjustment> _adjustments = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        _adjustments = await DbContext.StockAdjustments
+            .Include(a => a.Warehouse)
+            .OrderByDescending(a => a.CreatedAt)
+            .ToListAsync();
+        _loading = false;
+    }
+}

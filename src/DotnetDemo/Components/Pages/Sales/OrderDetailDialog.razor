@@ -1,0 +1,96 @@
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">訂單編號</MudText>
+                <MudText Typo="Typo.body1">@Order.OrderNumber</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">客戶</MudText>
+                <MudText Typo="Typo.body1">@(Order.Customer?.Name ?? "散客")</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">建立時間</MudText>
+                <MudText Typo="Typo.body1">@Order.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm:ss")</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">狀態</MudText>
+                <MudChip Size="Size.Small" Color="@GetStatusColor(Order.Status)">@GetStatusText(Order.Status)</MudChip>
+            </MudItem>
+        </MudGrid>
+
+        <MudDivider Class="my-4" />
+
+        <MudText Typo="Typo.h6" Class="mb-2">商品明細</MudText>
+        <MudSimpleTable Dense="true">
+            <thead>
+                <tr>
+                    <th>商品</th>
+                    <th>單價</th>
+                    <th>數量</th>
+                    <th>折扣</th>
+                    <th>小計</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Order.Items)
+                {
+                    <tr>
+                        <td>@item.ProductName</td>
+                        <td>@item.UnitPrice.ToString("C0")</td>
+                        <td>@item.Quantity</td>
+                        <td>@item.DiscountAmount.ToString("C0")</td>
+                        <td>@item.SubTotal.ToString("C0")</td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+
+        <MudDivider Class="my-4" />
+
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.h6" Class="mb-2">付款記錄</MudText>
+                @foreach (var payment in Order.Payments)
+                {
+                    <MudText>@payment.PaymentMethod.Name: @payment.Amount.ToString("C0")</MudText>
+                }
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.subtitle2">小計: @Order.SubTotal.ToString("C0")</MudText>
+                <MudText Typo="Typo.subtitle2">折扣: -@Order.DiscountAmount.ToString("C0")</MudText>
+                <MudText Typo="Typo.h6" Color="Color.Primary">總計: @Order.TotalAmount.ToString("C0")</MudText>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">關閉</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public Order Order { get; set; } = null!;
+
+    private void Close() => MudDialog.Close();
+
+    private Color GetStatusColor(OrderStatus status) => status switch
+    {
+        OrderStatus.Completed => Color.Success,
+        OrderStatus.Pending => Color.Warning,
+        OrderStatus.Confirmed => Color.Info,
+        OrderStatus.Cancelled => Color.Error,
+        OrderStatus.Refunded => Color.Secondary,
+        _ => Color.Default
+    };
+
+    private string GetStatusText(OrderStatus status) => status switch
+    {
+        OrderStatus.Pending => "待處理",
+        OrderStatus.Confirmed => "已確認",
+        OrderStatus.Completed => "已完成",
+        OrderStatus.Cancelled => "已取消",
+        OrderStatus.Refunded => "已退貨",
+        _ => status.ToString()
+    };
+}

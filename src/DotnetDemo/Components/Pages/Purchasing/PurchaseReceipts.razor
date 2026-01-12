@@ -1,0 +1,64 @@
+@page "/purchase-receipts"
+@attribute [Authorize]
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+
+<PageTitle>進貨單管理 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">進貨單管理</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">進貨單列表</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">
+                新增進貨單
+            </MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_receipts" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>進貨單號</MudTh>
+                <MudTh>採購單號</MudTh>
+                <MudTh>供應商</MudTh>
+                <MudTh>倉庫</MudTh>
+                <MudTh>進貨日期</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.ReceiptNumber</MudTd>
+                <MudTd>@context.PurchaseOrder?.OrderNumber</MudTd>
+                <MudTd>@context.PurchaseOrder?.Supplier?.Name</MudTd>
+                <MudTd>@context.Warehouse?.Name</MudTd>
+                <MudTd>@context.ReceiptDate.ToString("yyyy-MM-dd")</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary" />
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText>尚無進貨單資料</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<PurchaseReceipt> _receipts = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        _receipts = await DbContext.PurchaseReceipts
+            .Include(r => r.PurchaseOrder)
+                .ThenInclude(po => po!.Supplier)
+            .Include(r => r.Warehouse)
+            .OrderByDescending(r => r.ReceiptDate)
+            .ToListAsync();
+        _loading = false;
+    }
+}

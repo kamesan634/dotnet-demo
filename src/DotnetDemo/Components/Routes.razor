@@ -1,0 +1,42 @@
+@using Microsoft.AspNetCore.Components.Authorization
+
+<MudThemeProvider @bind-IsDarkMode="@_isDarkMode" Theme="_theme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<Router AppAssembly="@typeof(Program).Assembly">
+    <Found Context="routeData">
+        <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)">
+            <NotAuthorized>
+                @if (context.User.Identity?.IsAuthenticated != true)
+                {
+                    <RedirectToLogin />
+                }
+                else
+                {
+                    <p class="text-danger">您沒有權限存取此頁面。</p>
+                }
+            </NotAuthorized>
+        </AuthorizeRouteView>
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+</Router>
+
+@code {
+    private bool _isDarkMode = false;
+
+    private MudTheme _theme = new MudTheme()
+    {
+        Palette = new PaletteLight()
+        {
+            Primary = Colors.Blue.Default,
+            Secondary = Colors.Green.Accent4,
+            AppbarBackground = Colors.Blue.Default,
+        },
+        PaletteDark = new PaletteDark()
+        {
+            Primary = Colors.Blue.Lighten1
+        }
+    };
+}

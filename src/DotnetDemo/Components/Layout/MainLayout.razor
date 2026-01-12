@@ -1,0 +1,35 @@
+@inherits LayoutComponentBase
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@DrawerToggle" />
+        <MudText Typo="Typo.h5" Class="ml-3">零售管理系統</MudText>
+        <MudSpacer />
+        <AuthorizeView>
+            <Authorized>
+                <MudMenu Icon="@Icons.Material.Filled.Person" Color="Color.Inherit">
+                    <MudMenuItem>@context.User.Identity?.Name</MudMenuItem>
+                    <MudDivider />
+                    <MudMenuItem Href="/logout">登出</MudMenuItem>
+                </MudMenu>
+            </Authorized>
+        </AuthorizeView>
+    </MudAppBar>
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="2" Variant="@DrawerVariant.Mini" OpenMiniOnHover="true">
+        <NavMenu />
+    </MudDrawer>
+    <MudMainContent Class="pt-16 px-4">
+        <MudContainer MaxWidth="MaxWidth.False" Class="my-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+
+    private void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+}

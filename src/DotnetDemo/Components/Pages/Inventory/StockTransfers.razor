@@ -1,0 +1,86 @@
+@page "/stock-transfers"
+@attribute [Authorize]
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+@inject ISnackbar Snackbar
+
+<PageTitle>庫存調撥 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">庫存調撥</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">調撥單列表</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">
+                新增調撥單
+            </MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_transfers" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>調撥單號</MudTh>
+                <MudTh>調出倉庫</MudTh>
+                <MudTh>調入倉庫</MudTh>
+                <MudTh>狀態</MudTh>
+                <MudTh>建立時間</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.TransferNumber</MudTd>
+                <MudTd>@context.FromWarehouse?.Name</MudTd>
+                <MudTd>@context.ToWarehouse?.Name</MudTd>
+                <MudTd>
+                    <MudChip Size="Size.Small" Color="@GetStatusColor(context.Status)">
+                        @GetStatusText(context.Status)
+                    </MudChip>
+                </MudTd>
+                <MudTd>@context.CreatedAt.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary" />
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText>尚無調撥單資料</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<StockTransfer> _transfers = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        _transfers = await DbContext.StockTransfers
+            .Include(t => t.FromWarehouse)
+            .Include(t => t.ToWarehouse)
+            .OrderByDescending(t => t.CreatedAt)
+            .ToListAsync();
+        _loading = false;
+    }
+
+    private Color GetStatusColor(StockTransferStatus status) => status switch
+    {
+        StockTransferStatus.Pending => Color.Warning,
+        StockTransferStatus.Shipped => Color.Primary,
+        StockTransferStatus.Received => Color.Success,
+        StockTransferStatus.Cancelled => Color.Error,
+        _ => Color.Default
+    };
+
+    private string GetStatusText(StockTransferStatus status) => status switch
+    {
+        StockTransferStatus.Pending => "待出庫",
+        StockTransferStatus.Shipped => "已出庫",
+        StockTransferStatus.Received => "已入庫",
+        StockTransferStatus.Cancelled => "已取消",
+        _ => "未知"
+    };
+}

@@ -1,0 +1,129 @@
+@page "/inventory"
+@attribute [Authorize]
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+
+<PageTitle>庫存查詢 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">庫存查詢</MudText>
+
+<MudCard Class="mb-4">
+    <MudCardContent>
+        <MudGrid>
+            <MudItem xs="12" sm="4">
+                <MudTextField @bind-Value="_searchText" Label="搜尋" Placeholder="商品名稱/代碼"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Immediate="true" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudSelect T="int?" @bind-Value="_selectedWarehouseId" Label="倉庫" Clearable="true">
+                    @foreach (var warehouse in _warehouses)
+                    {
+                        <MudSelectItem Value="@((int?)warehouse.Id)">@warehouse.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudCheckBox T="bool" @bind-Value="_showLowStockOnly" Label="僅顯示低庫存" Color="Color.Warning" />
+            </MudItem>
+            <MudItem xs="12" sm="2" Class="d-flex align-end">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SearchAsync">搜尋</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudCardContent>
+</MudCard>
+
+<MudCard>
+    <MudCardContent>
+        <MudTable Items="@_inventories" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>商品代碼</MudTh>
+                <MudTh>商品名稱</MudTh>
+                <MudTh>倉庫</MudTh>
+                <MudTh>庫存數量</MudTh>
+                <MudTh>預留數量</MudTh>
+                <MudTh>可用數量</MudTh>
+                <MudTh>安全庫存</MudTh>
+                <MudTh>狀態</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="商品代碼">@context.Product.Code</MudTd>
+                <MudTd DataLabel="商品名稱">@context.Product.Name</MudTd>
+                <MudTd DataLabel="倉庫">@context.Warehouse.Name</MudTd>
+                <MudTd DataLabel="庫存數量">@context.Quantity</MudTd>
+                <MudTd DataLabel="預留數量">@context.ReservedQuantity</MudTd>
+                <MudTd DataLabel="可用數量">
+                    <MudChip Size="Size.Small" Color="@(context.AvailableQuantity < context.Product.SafetyStock ? Color.Error : Color.Success)">
+                        @context.AvailableQuantity
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="安全庫存">@context.Product.SafetyStock</MudTd>
+                <MudTd DataLabel="狀態">
+                    @if (context.Quantity < context.Product.SafetyStock)
+                    {
+                        <MudChip Size="Size.Small" Color="Color.Error" Icon="@Icons.Material.Filled.Warning">低庫存</MudChip>
+                    }
+                    else
+                    {
+                        <MudChip Size="Size.Small" Color="Color.Success">正常</MudChip>
+                    }
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+            </PagerContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<Inventory> _inventories = new();
+    private List<Warehouse> _warehouses = new();
+    private bool _loading = true;
+    private string? _searchText;
+    private int? _selectedWarehouseId;
+    private bool _showLowStockOnly;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _warehouses = await DbContext.Warehouses.Where(w => w.IsActive).ToListAsync();
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        _loading = true;
+        try
+        {
+            var query = DbContext.Inventories
+                .Include(i => i.Product)
+                .Include(i => i.Warehouse)
+                .Where(i => i.Product.IsActive)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(_searchText))
+            {
+                query = query.Where(i =>
+                    i.Product.Name.Contains(_searchText) ||
+                    i.Product.Code.Contains(_searchText));
+            }
+
+            if (_selectedWarehouseId.HasValue)
+            {
+                query = query.Where(i => i.WarehouseId == _selectedWarehouseId.Value);
+            }
+
+            if (_showLowStockOnly)
+            {
+                query = query.Where(i => i.Quantity < i.Product.SafetyStock);
+            }
+
+            _inventories = await query.OrderBy(i => i.Product.Code).ToListAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

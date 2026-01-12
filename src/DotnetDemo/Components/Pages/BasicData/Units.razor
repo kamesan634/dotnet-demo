@@ -1,0 +1,101 @@
+@page "/units"
+@attribute [Authorize]
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>單位管理 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">單位管理</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">單位列表</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAddDialog">新增單位</MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_units" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>代碼</MudTh>
+                <MudTh>名稱</MudTh>
+                <MudTh>狀態</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="代碼">@context.Code</MudTd>
+                <MudTd DataLabel="名稱">@context.Name</MudTd>
+                <MudTd DataLabel="狀態">
+                    <MudChip Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Default)">
+                        @(context.IsActive ? "啟用" : "停用")
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="操作">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => OpenEditDialog(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="@(() => DeleteUnit(context))" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<Unit> _units = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        _units = await DbContext.Units.OrderBy(u => u.Code).ToListAsync();
+        _loading = false;
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var result = await DialogService.ShowMessageBox(
+            "新增單位",
+            (MarkupString)"<input id='code' placeholder='代碼' /><br/><input id='name' placeholder='名稱' />",
+            yesText: "儲存", cancelText: "取消");
+
+        // 簡化版，實際應使用 Dialog 元件
+    }
+
+    private async Task OpenEditDialog(Unit unit)
+    {
+        // 簡化版
+    }
+
+    private async Task DeleteUnit(Unit unit)
+    {
+        if (await DbContext.Products.AnyAsync(p => p.UnitId == unit.Id))
+        {
+            Snackbar.Add("無法刪除已被使用的單位", Severity.Error);
+            return;
+        }
+
+        var result = await DialogService.ShowMessageBox(
+            "確認刪除", $"確定要刪除單位「{unit.Name}」嗎？",
+            yesText: "刪除", cancelText: "取消");
+
+        if (result == true)
+        {
+            DbContext.Units.Remove(unit);
+            await DbContext.SaveChangesAsync();
+            await LoadDataAsync();
+            Snackbar.Add("單位已刪除", Severity.Success);
+        }
+    }
+}

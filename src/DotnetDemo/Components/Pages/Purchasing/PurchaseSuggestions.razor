@@ -1,0 +1,71 @@
+@page "/purchase-suggestions"
+@attribute [Authorize]
+@using DotnetDemo.Services.Interfaces
+@inject IReportService ReportService
+@inject ISnackbar Snackbar
+
+<PageTitle>採購建議 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">採購建議</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">建議採購商品</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
+                       OnClick="LoadDataAsync">重新計算</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.ShoppingCart"
+                       OnClick="CreatePurchaseOrder" Disabled="@(!_selectedItems.Any())" Class="ml-2">
+                轉為採購單
+            </MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_suggestions" Dense="true" Hover="true" Loading="@_loading" MultiSelection="true"
+                  @bind-SelectedItems="_selectedItems">
+            <HeaderContent>
+                <MudTh>商品代碼</MudTh>
+                <MudTh>商品名稱</MudTh>
+                <MudTh>現有庫存</MudTh>
+                <MudTh>安全庫存</MudTh>
+                <MudTh>建議採購量</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.ProductCode</MudTd>
+                <MudTd>@context.ProductName</MudTd>
+                <MudTd>@context.Quantity</MudTd>
+                <MudTd>@context.SafetyStock</MudTd>
+                <MudTd>@Math.Max(context.SafetyStock * 2 - context.Quantity, context.SafetyStock)</MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudAlert Severity="Severity.Success">目前沒有需要採購的商品</MudAlert>
+            </NoRecordsContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<InventoryReport> _suggestions = new();
+    private HashSet<InventoryReport> _selectedItems = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        _selectedItems.Clear();
+        _suggestions = await ReportService.GetInventoryReportAsync(null, lowStockOnly: true);
+        _loading = false;
+    }
+
+    private void CreatePurchaseOrder()
+    {
+        Snackbar.Add($"已選擇 {_selectedItems.Count} 項商品，功能開發中", Severity.Info);
+    }
+}

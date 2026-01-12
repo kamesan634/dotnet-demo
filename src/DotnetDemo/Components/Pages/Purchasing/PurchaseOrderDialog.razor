@@ -1,0 +1,167 @@
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="int" @bind-Value="PurchaseOrder.SupplierId" Label="供應商" Required="true">
+                    @foreach (var supplier in _suppliers)
+                    {
+                        <MudSelectItem Value="@supplier.Id">@supplier.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="int" @bind-Value="PurchaseOrder.WarehouseId" Label="目標倉庫" Required="true">
+                    @foreach (var warehouse in _warehouses)
+                    {
+                        <MudSelectItem Value="@warehouse.Id">@warehouse.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudDatePicker @bind-Date="_expectedDate" Label="預計交貨日" Required="true" DateFormat="yyyy/MM/dd" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="PurchaseOrder.Notes" Label="備註" Lines="2" />
+            </MudItem>
+        </MudGrid>
+
+        <MudDivider Class="my-4" />
+
+        <MudText Typo="Typo.h6" Class="mb-2">商品明細</MudText>
+        <MudTable Items="@PurchaseOrder.Items" Dense="true">
+            <HeaderContent>
+                <MudTh>商品</MudTh>
+                <MudTh>數量</MudTh>
+                <MudTh>單價</MudTh>
+                <MudTh>小計</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Product?.Name</MudTd>
+                <MudTd>@context.Quantity</MudTd>
+                <MudTd>@context.UnitPrice.ToString("C0")</MudTd>
+                <MudTd>@context.SubTotal.ToString("C0")</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="@(() => RemoveItem(context))" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+
+        <MudGrid Class="mt-4">
+            <MudItem xs="12" sm="4">
+                <MudAutocomplete T="Product" @bind-Value="_selectedProduct" Label="選擇商品"
+                                 SearchFunc="SearchProducts" ToStringFunc="@(p => p?.Name ?? "")" />
+            </MudItem>
+            <MudItem xs="12" sm="2">
+                <MudNumericField @bind-Value="_quantity" Label="數量" Min="1" />
+            </MudItem>
+            <MudItem xs="12" sm="2">
+                <MudNumericField @bind-Value="_unitPrice" Label="單價" Min="0" Format="N0" />
+            </MudItem>
+            <MudItem xs="12" sm="2" Class="d-flex align-end">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="AddItem">新增</MudButton>
+            </MudItem>
+        </MudGrid>
+
+        <MudText Typo="Typo.h6" Class="mt-4" Align="Align.Right">
+            總計: @PurchaseOrder.Items.Sum(i => i.SubTotal).ToString("C0")
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">儲存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public PurchaseOrder PurchaseOrder { get; set; } = new();
+    [Parameter] public bool IsNew { get; set; }
+
+    private List<Supplier> _suppliers = new();
+    private List<Warehouse> _warehouses = new();
+    private DateTime? _expectedDate;
+    private Product? _selectedProduct;
+    private int _quantity = 1;
+    private decimal _unitPrice;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _suppliers = await DbContext.Suppliers.Where(s => s.IsActive).OrderBy(s => s.Name).ToListAsync();
+        _warehouses = await DbContext.Warehouses.Where(w => w.IsActive).OrderBy(w => w.Name).ToListAsync();
+
+        if (PurchaseOrder.ExpectedDeliveryDate != default)
+        {
+            _expectedDate = PurchaseOrder.ExpectedDeliveryDate.ToDateTime(TimeOnly.MinValue);
+        }
+    }
+
+    private async Task<IEnumerable<Product>> SearchProducts(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return await DbContext.Products.Where(p => p.IsActive).Take(10).ToListAsync();
+
+        return await DbContext.Products
+            .Where(p => p.IsActive && (p.Name.Contains(value) || p.Code.Contains(value)))
+            .Take(10)
+            .ToListAsync();
+    }
+
+    private void AddItem()
+    {
+        if (_selectedProduct == null || _quantity <= 0) return;
+
+        var item = new PurchaseOrderItem
+        {
+            ProductId = _selectedProduct.Id,
+            Product = _selectedProduct,
+            Quantity = _quantity,
+            UnitPrice = _unitPrice > 0 ? _unitPrice : _selectedProduct.CostPrice,
+            SubTotal = (_unitPrice > 0 ? _unitPrice : _selectedProduct.CostPrice) * _quantity
+        };
+
+        PurchaseOrder.Items.Add(item);
+        _selectedProduct = null;
+        _quantity = 1;
+        _unitPrice = 0;
+    }
+
+    private void RemoveItem(PurchaseOrderItem item)
+    {
+        PurchaseOrder.Items.Remove(item);
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_expectedDate.HasValue)
+        {
+            PurchaseOrder.ExpectedDeliveryDate = DateOnly.FromDateTime(_expectedDate.Value);
+        }
+
+        PurchaseOrder.TotalAmount = PurchaseOrder.Items.Sum(i => i.SubTotal);
+
+        if (IsNew)
+        {
+            PurchaseOrder.OrderNumber = $"PO{DateTime.UtcNow:yyyyMMddHHmmss}";
+            PurchaseOrder.Status = PurchaseOrderStatus.Draft;
+            PurchaseOrder.CreatedAt = DateTime.UtcNow;
+            PurchaseOrder.CreatedBy = 1;
+            DbContext.PurchaseOrders.Add(PurchaseOrder);
+        }
+        else
+        {
+            PurchaseOrder.UpdatedAt = DateTime.UtcNow;
+            DbContext.PurchaseOrders.Update(PurchaseOrder);
+        }
+
+        await DbContext.SaveChangesAsync();
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

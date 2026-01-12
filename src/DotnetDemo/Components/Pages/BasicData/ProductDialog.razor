@@ -1,0 +1,107 @@
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+
+<MudDialog>
+    <DialogContent>
+        <EditForm Model="@Product" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Product.Code" Label="商品代碼" Required="true"
+                                  RequiredError="請輸入商品代碼" Disabled="@(!IsNew)" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Product.Barcode" Label="條碼" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Product.Name" Label="商品名稱" Required="true"
+                                  RequiredError="請輸入商品名稱" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Product.Description" Label="描述" Lines="2" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int" @bind-Value="Product.CategoryId" Label="分類" Required="true"
+                               RequiredError="請選擇分類">
+                        @foreach (var category in _categories)
+                        {
+                            <MudSelectItem Value="@category.Id">@category.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int" @bind-Value="Product.UnitId" Label="單位" Required="true"
+                               RequiredError="請選擇單位">
+                        @foreach (var unit in _units)
+                        {
+                            <MudSelectItem Value="@unit.Id">@unit.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="Product.CostPrice" Label="成本價" Min="0"
+                                     Format="N0" Adornment="Adornment.Start" AdornmentText="$" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="Product.SellingPrice" Label="售價" Min="0"
+                                     Format="N0" Adornment="Adornment.Start" AdornmentText="$" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="Product.SafetyStock" Label="安全庫存" Min="0" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int?" @bind-Value="Product.DefaultSupplierId" Label="預設供應商" Clearable="true">
+                        @foreach (var supplier in _suppliers)
+                        {
+                            <MudSelectItem Value="@((int?)supplier.Id)">@supplier.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSwitch T="bool" @bind-Value="Product.IsActive" Label="啟用" Color="Color.Primary" />
+                </MudItem>
+            </MudGrid>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">儲存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public Product Product { get; set; } = new();
+    [Parameter] public bool IsNew { get; set; }
+
+    private List<Category> _categories = new();
+    private List<Unit> _units = new();
+    private List<Supplier> _suppliers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _categories = await DbContext.Categories.Where(c => c.IsActive).OrderBy(c => c.Name).ToListAsync();
+        _units = await DbContext.Units.Where(u => u.IsActive).OrderBy(u => u.Name).ToListAsync();
+        _suppliers = await DbContext.Suppliers.Where(s => s.IsActive).OrderBy(s => s.Name).ToListAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        if (IsNew)
+        {
+            Product.CreatedAt = DateTime.UtcNow;
+            DbContext.Products.Add(Product);
+        }
+        else
+        {
+            Product.UpdatedAt = DateTime.UtcNow;
+            DbContext.Products.Update(Product);
+        }
+
+        await DbContext.SaveChangesAsync();
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

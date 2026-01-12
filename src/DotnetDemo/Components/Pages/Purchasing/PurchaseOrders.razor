@@ -1,0 +1,236 @@
+@page "/purchase-orders"
+@attribute [Authorize]
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>採購單管理 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">採購單管理</MudText>
+
+<MudCard Class="mb-4">
+    <MudCardContent>
+        <MudGrid>
+            <MudItem xs="12" sm="3">
+                <MudTextField @bind-Value="_searchText" Label="採購單號" Placeholder="輸入採購單號"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudSelect T="int?" @bind-Value="_selectedSupplierId" Label="供應商" Clearable="true">
+                    @foreach (var supplier in _suppliers)
+                    {
+                        <MudSelectItem Value="@((int?)supplier.Id)">@supplier.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="2">
+                <MudSelect T="PurchaseOrderStatus?" @bind-Value="_selectedStatus" Label="狀態" Clearable="true">
+                    <MudSelectItem Value="@((PurchaseOrderStatus?)PurchaseOrderStatus.Draft)">草稿</MudSelectItem>
+                    <MudSelectItem Value="@((PurchaseOrderStatus?)PurchaseOrderStatus.PendingApproval)">待核准</MudSelectItem>
+                    <MudSelectItem Value="@((PurchaseOrderStatus?)PurchaseOrderStatus.Approved)">已核准</MudSelectItem>
+                    <MudSelectItem Value="@((PurchaseOrderStatus?)PurchaseOrderStatus.PartialReceived)">部分收貨</MudSelectItem>
+                    <MudSelectItem Value="@((PurchaseOrderStatus?)PurchaseOrderStatus.Completed)">已完成</MudSelectItem>
+                    <MudSelectItem Value="@((PurchaseOrderStatus?)PurchaseOrderStatus.Cancelled)">已取消</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="2" Class="d-flex align-end">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SearchAsync">搜尋</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudCardContent>
+</MudCard>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">採購單列表</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAddDialog">新增採購單</MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_orders" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>採購單號</MudTh>
+                <MudTh>供應商</MudTh>
+                <MudTh>目標倉庫</MudTh>
+                <MudTh>預計交貨日</MudTh>
+                <MudTh>總金額</MudTh>
+                <MudTh>狀態</MudTh>
+                <MudTh>建立時間</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="採購單號">@context.OrderNumber</MudTd>
+                <MudTd DataLabel="供應商">@context.Supplier.Name</MudTd>
+                <MudTd DataLabel="目標倉庫">@context.Warehouse.Name</MudTd>
+                <MudTd DataLabel="預計交貨日">@context.ExpectedDeliveryDate.ToString("yyyy/MM/dd")</MudTd>
+                <MudTd DataLabel="總金額">@context.TotalAmount.ToString("C0")</MudTd>
+                <MudTd DataLabel="狀態">
+                    <MudChip Size="Size.Small" Color="@GetStatusColor(context.Status)">
+                        @GetStatusText(context.Status)
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="建立時間">@context.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd")</MudTd>
+                <MudTd DataLabel="操作">
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => ViewOrder(context))" />
+                    @if (context.Status == PurchaseOrderStatus.Draft)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Info"
+                                       OnClick="@(() => OpenEditDialog(context))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                       OnClick="@(() => DeleteOrder(context))" />
+                    }
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+            </PagerContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<PurchaseOrder> _orders = new();
+    private List<Supplier> _suppliers = new();
+    private bool _loading = true;
+    private string? _searchText;
+    private int? _selectedSupplierId;
+    private PurchaseOrderStatus? _selectedStatus;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _suppliers = await DbContext.Suppliers.Where(s => s.IsActive).OrderBy(s => s.Name).ToListAsync();
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        _loading = true;
+        try
+        {
+            var query = DbContext.PurchaseOrders
+                .Include(o => o.Supplier)
+                .Include(o => o.Warehouse)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(_searchText))
+            {
+                query = query.Where(o => o.OrderNumber.Contains(_searchText));
+            }
+
+            if (_selectedSupplierId.HasValue)
+            {
+                query = query.Where(o => o.SupplierId == _selectedSupplierId.Value);
+            }
+
+            if (_selectedStatus.HasValue)
+            {
+                query = query.Where(o => o.Status == _selectedStatus.Value);
+            }
+
+            _orders = await query.OrderByDescending(o => o.CreatedAt).Take(100).ToListAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            ["PurchaseOrder"] = new PurchaseOrder { ExpectedDeliveryDate = DateOnly.FromDateTime(DateTime.Now.AddDays(7)) },
+            ["IsNew"] = true
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<PurchaseOrderDialog>("新增採購單", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await SearchAsync();
+            Snackbar.Add("採購單新增成功", Severity.Success);
+        }
+    }
+
+    private async Task OpenEditDialog(PurchaseOrder order)
+    {
+        var fullOrder = await DbContext.PurchaseOrders
+            .Include(o => o.Items).ThenInclude(i => i.Product)
+            .FirstOrDefaultAsync(o => o.Id == order.Id);
+
+        if (fullOrder != null)
+        {
+            var parameters = new DialogParameters { ["PurchaseOrder"] = fullOrder, ["IsNew"] = false };
+            var options = new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true };
+            var dialog = await DialogService.ShowAsync<PurchaseOrderDialog>("編輯採購單", parameters, options);
+            var result = await dialog.Result;
+
+            if (result != null && !result.Canceled)
+            {
+                await SearchAsync();
+                Snackbar.Add("採購單更新成功", Severity.Success);
+            }
+        }
+    }
+
+    private async Task ViewOrder(PurchaseOrder order)
+    {
+        var fullOrder = await DbContext.PurchaseOrders
+            .Include(o => o.Supplier)
+            .Include(o => o.Warehouse)
+            .Include(o => o.Items).ThenInclude(i => i.Product)
+            .FirstOrDefaultAsync(o => o.Id == order.Id);
+
+        if (fullOrder != null)
+        {
+            var parameters = new DialogParameters { ["Order"] = fullOrder };
+            var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+            await DialogService.ShowAsync<PurchaseOrderDetailDialog>("採購單詳情", parameters, options);
+        }
+    }
+
+    private async Task DeleteOrder(PurchaseOrder order)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "確認刪除", $"確定要刪除採購單「{order.OrderNumber}」嗎？",
+            yesText: "刪除", cancelText: "取消");
+
+        if (result == true)
+        {
+            DbContext.PurchaseOrders.Remove(order);
+            await DbContext.SaveChangesAsync();
+            await SearchAsync();
+            Snackbar.Add("採購單已刪除", Severity.Success);
+        }
+    }
+
+    private Color GetStatusColor(PurchaseOrderStatus status) => status switch
+    {
+        PurchaseOrderStatus.Draft => Color.Default,
+        PurchaseOrderStatus.PendingApproval => Color.Warning,
+        PurchaseOrderStatus.Approved => Color.Info,
+        PurchaseOrderStatus.PartialReceived => Color.Primary,
+        PurchaseOrderStatus.Completed => Color.Success,
+        PurchaseOrderStatus.Cancelled => Color.Error,
+        _ => Color.Default
+    };
+
+    private string GetStatusText(PurchaseOrderStatus status) => status switch
+    {
+        PurchaseOrderStatus.Draft => "草稿",
+        PurchaseOrderStatus.PendingApproval => "待核准",
+        PurchaseOrderStatus.Approved => "已核准",
+        PurchaseOrderStatus.PartialReceived => "部分收貨",
+        PurchaseOrderStatus.Completed => "已完成",
+        PurchaseOrderStatus.Cancelled => "已取消",
+        _ => status.ToString()
+    };
+}

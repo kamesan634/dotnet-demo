@@ -1,0 +1,92 @@
+/* 基本樣式 */
+html, body {
+    font-family: 'Roboto', 'Microsoft JhengHei', sans-serif;
+    height: 100%;
+    margin: 0;
+}
+
+/* 連結樣式 */
+a, .mud-link {
+    text-decoration: none;
+}
+
+/* 登入頁面背景 */
+.login-background {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+}
+
+/* 資料表格 */
+.mud-table-container {
+    overflow-x: auto;
+}
+
+/* 響應式調整 */
+@media (max-width: 600px) {
+    .mud-card-header {
+        flex-direction: column;
+        align-items: flex-start !important;
+    }
+
+    .mud-card-header-actions {
+        margin-top: 8px;
+        width: 100%;
+    }
+
+    .mud-card-header-actions .mud-button {
+        width: 100%;
+    }
+}
+
+/* 載入動畫 */
+.loading-progress {
+    position: relative;
+    display: block;
+    width: 8rem;
+    height: 8rem;
+    margin: 20vh auto 1rem auto;
+}
+
+.loading-progress circle {
+    fill: none;
+    stroke: #1976d2;
+    stroke-width: 0.6rem;
+    transform-origin: 50% 50%;
+    transform: rotate(-90deg);
+}
+
+.loading-progress circle:last-child {
+    stroke: #e0e0e0;
+    stroke-dasharray: calc(3.14159 * 8rem);
+    stroke-dashoffset: 0;
+}
+
+.loading-progress-text {
+    position: absolute;
+    text-align: center;
+    font-weight: bold;
+    inset: calc(20vh + 3.25rem) 0 auto 0.2rem;
+}
+
+.loading-progress-text:after {
+    content: "載入中...";
+}
+
+/* 自訂滾動條 */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}

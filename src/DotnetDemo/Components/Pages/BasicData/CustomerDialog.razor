@@ -1,0 +1,94 @@
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+
+<MudDialog>
+    <DialogContent>
+        <EditForm Model="@Customer">
+            <DataAnnotationsValidator />
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Customer.Code" Label="會員卡號" Required="true" Disabled="@(!IsNew)" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Customer.Name" Label="姓名" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Customer.Phone" Label="電話" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Customer.Email" Label="電子郵件" InputType="InputType.Email" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Customer.Address" Label="地址" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker @bind-Date="_birthday" Label="生日" DateFormat="yyyy/MM/dd" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int" @bind-Value="Customer.CustomerLevelId" Label="會員等級" Required="true">
+                        @foreach (var level in _levels)
+                        {
+                            <MudSelectItem Value="@level.Id">@level.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="Customer.Points" Label="點數" Min="0" Disabled="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSwitch T="bool" @bind-Value="Customer.IsActive" Label="啟用" Color="Color.Primary" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Customer.Notes" Label="備註" Lines="2" />
+                </MudItem>
+            </MudGrid>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">儲存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public Customer Customer { get; set; } = new();
+    [Parameter] public bool IsNew { get; set; }
+
+    private List<CustomerLevel> _levels = new();
+    private DateTime? _birthday;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _levels = await DbContext.CustomerLevels.Where(l => l.IsActive).OrderBy(l => l.SortOrder).ToListAsync();
+        if (Customer.Birthday.HasValue)
+        {
+            _birthday = Customer.Birthday.Value.ToDateTime(TimeOnly.MinValue);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_birthday.HasValue)
+        {
+            Customer.Birthday = DateOnly.FromDateTime(_birthday.Value);
+        }
+
+        if (IsNew)
+        {
+            Customer.CreatedAt = DateTime.UtcNow;
+            DbContext.Customers.Add(Customer);
+        }
+        else
+        {
+            Customer.UpdatedAt = DateTime.UtcNow;
+            DbContext.Customers.Update(Customer);
+        }
+
+        await DbContext.SaveChangesAsync();
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

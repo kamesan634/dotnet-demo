@@ -1,0 +1,191 @@
+is_global = true
+build_property.TargetFramework = net8.0
+build_property.TargetPlatformMinVersion = 
+build_property.UsingMicrosoftNETSdkWeb = true
+build_property.ProjectTypeGuids = 
+build_property.InvariantGlobalization = 
+build_property.PlatformNeutralAssembly = 
+build_property.EnforceExtendedAnalyzerRules = 
+build_property._SupportedPlatformList = Linux,macOS,Windows
+build_property.RootNamespace = DotnetDemo
+build_property.RootNamespace = DotnetDemo
+build_property.ProjectDir = /app/src/DotnetDemo/
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 
+build_property.RazorLangVersion = 8.0
+build_property.SupportLocalizedComponentNames = 
+build_property.GenerateRazorMetadataSourceChecksumAttributes = 
+build_property.MSBuildProjectDirectory = /app/src/DotnetDemo
+build_property._RazorSourceGeneratorDebug = 
+
+[/app/src/DotnetDemo/Components/App.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9BcHAucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Layout/LoginLayout.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9MYXlvdXQvTG9naW5MYXlvdXQucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Layout/MainLayout.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9MYXlvdXQvTWFpbkxheW91dC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Layout/NavMenu.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9MYXlvdXQvTmF2TWVudS5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Admin/AuditLogs.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9BZG1pbi9BdWRpdExvZ3MucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Admin/Roles.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9BZG1pbi9Sb2xlcy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Admin/StoreDialog.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9BZG1pbi9TdG9yZURpYWxvZy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Admin/Stores.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9BZG1pbi9TdG9yZXMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Admin/Users.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9BZG1pbi9Vc2Vycy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Auth/Login.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9BdXRoL0xvZ2luLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Auth/Logout.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9BdXRoL0xvZ291dC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/BasicData/Categories.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9CYXNpY0RhdGEvQ2F0ZWdvcmllcy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/BasicData/CategoryDialog.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9CYXNpY0RhdGEvQ2F0ZWdvcnlEaWFsb2cucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/BasicData/CustomerDialog.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9CYXNpY0RhdGEvQ3VzdG9tZXJEaWFsb2cucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/BasicData/Customers.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9CYXNpY0RhdGEvQ3VzdG9tZXJzLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/BasicData/PaymentMethodDialog.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9CYXNpY0RhdGEvUGF5bWVudE1ldGhvZERpYWxvZy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/BasicData/PaymentMethods.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9CYXNpY0RhdGEvUGF5bWVudE1ldGhvZHMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/BasicData/ProductDialog.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9CYXNpY0RhdGEvUHJvZHVjdERpYWxvZy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/BasicData/Products.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9CYXNpY0RhdGEvUHJvZHVjdHMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/BasicData/SupplierDialog.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9CYXNpY0RhdGEvU3VwcGxpZXJEaWFsb2cucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/BasicData/Suppliers.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9CYXNpY0RhdGEvU3VwcGxpZXJzLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/BasicData/Units.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9CYXNpY0RhdGEvVW5pdHMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/BasicData/WarehouseDialog.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9CYXNpY0RhdGEvV2FyZWhvdXNlRGlhbG9nLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/BasicData/Warehouses.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9CYXNpY0RhdGEvV2FyZWhvdXNlcy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Dashboard/Index.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9EYXNoYm9hcmQvSW5kZXgucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Inventory/Index.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9JbnZlbnRvcnkvSW5kZXgucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Inventory/LowStockAlerts.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9JbnZlbnRvcnkvTG93U3RvY2tBbGVydHMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Inventory/StockAdjustments.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9JbnZlbnRvcnkvU3RvY2tBZGp1c3RtZW50cy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Inventory/StockTransfers.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9JbnZlbnRvcnkvU3RvY2tUcmFuc2ZlcnMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Purchasing/PurchaseOrderDetailDialog.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9QdXJjaGFzaW5nL1B1cmNoYXNlT3JkZXJEZXRhaWxEaWFsb2cucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Purchasing/PurchaseOrderDialog.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9QdXJjaGFzaW5nL1B1cmNoYXNlT3JkZXJEaWFsb2cucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Purchasing/PurchaseOrders.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9QdXJjaGFzaW5nL1B1cmNoYXNlT3JkZXJzLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Purchasing/PurchaseReceipts.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9QdXJjaGFzaW5nL1B1cmNoYXNlUmVjZWlwdHMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Purchasing/PurchaseSuggestions.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9QdXJjaGFzaW5nL1B1cmNoYXNlU3VnZ2VzdGlvbnMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Reports/Inventory.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9SZXBvcnRzL0ludmVudG9yeS5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Reports/Purchasing.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9SZXBvcnRzL1B1cmNoYXNpbmcucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Reports/Sales.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9SZXBvcnRzL1NhbGVzLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Sales/OrderDetailDialog.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9TYWxlcy9PcmRlckRldGFpbERpYWxvZy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Sales/Orders.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9TYWxlcy9PcmRlcnMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Pages/Sales/Pos.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9TYWxlcy9Qb3MucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/RedirectToLogin.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9SZWRpcmVjdFRvTG9naW4ucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/Routes.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9Sb3V0ZXMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/app/src/DotnetDemo/Components/_Imports.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9fSW1wb3J0cy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 

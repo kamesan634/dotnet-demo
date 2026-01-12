@@ -1,0 +1,142 @@
+@page "/audit-logs"
+@attribute [Authorize(Roles = "Admin")]
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+
+<PageTitle>操作紀錄 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">操作紀錄</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudGrid>
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_searchUser" Label="使用者" Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Person" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="string" @bind-Value="_searchAction" Label="操作類型" Variant="Variant.Outlined" Clearable="true">
+                        <MudSelectItem Value="@("Create")">新增</MudSelectItem>
+                        <MudSelectItem Value="@("Update")">更新</MudSelectItem>
+                        <MudSelectItem Value="@("Delete")">刪除</MudSelectItem>
+                        <MudSelectItem Value="@("Login")">登入</MudSelectItem>
+                        <MudSelectItem Value="@("Logout")">登出</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudDateRangePicker @bind-DateRange="_dateRange" Label="日期範圍" Variant="Variant.Outlined" />
+                </MudItem>
+            </MudGrid>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SearchAsync"
+                       StartIcon="@Icons.Material.Filled.Search">搜尋</MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_logs" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>時間</MudTh>
+                <MudTh>使用者</MudTh>
+                <MudTh>操作</MudTh>
+                <MudTh>實體類型</MudTh>
+                <MudTh>實體 ID</MudTh>
+                <MudTh>IP 位址</MudTh>
+                <MudTh>詳細</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
+                <MudTd>@context.UserName</MudTd>
+                <MudTd>
+                    <MudChip Size="Size.Small" Color="@GetActionColor(context.Action)">
+                        @GetActionText(context.Action)
+                    </MudChip>
+                </MudTd>
+                <MudTd>@context.EntityType</MudTd>
+                <MudTd>@context.EntityId</MudTd>
+                <MudTd>@context.IpAddress</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Info" Size="Size.Small" Color="Color.Info"
+                                   OnClick="@(() => ShowDetails(context))" />
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<AuditLog> _logs = new();
+    private bool _loading = true;
+    private string? _searchUser;
+    private string? _searchAction;
+    private DateRange _dateRange = new(DateTime.Today.AddDays(-7), DateTime.Today);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        _loading = true;
+
+        var query = DbContext.AuditLogs.AsQueryable();
+
+        if (!string.IsNullOrEmpty(_searchUser))
+        {
+            query = query.Where(l => l.UserName != null && l.UserName.Contains(_searchUser));
+        }
+
+        if (!string.IsNullOrEmpty(_searchAction))
+        {
+            query = query.Where(l => l.Action == _searchAction);
+        }
+
+        if (_dateRange.Start.HasValue)
+        {
+            query = query.Where(l => l.CreatedAt >= _dateRange.Start.Value);
+        }
+
+        if (_dateRange.End.HasValue)
+        {
+            query = query.Where(l => l.CreatedAt <= _dateRange.End.Value.AddDays(1));
+        }
+
+        _logs = await query
+            .OrderByDescending(l => l.CreatedAt)
+            .Take(500)
+            .ToListAsync();
+
+        _loading = false;
+    }
+
+    private Color GetActionColor(string action) => action switch
+    {
+        "Create" => Color.Success,
+        "Update" => Color.Info,
+        "Delete" => Color.Error,
+        "Login" => Color.Primary,
+        "Logout" => Color.Secondary,
+        _ => Color.Default
+    };
+
+    private string GetActionText(string action) => action switch
+    {
+        "Create" => "新增",
+        "Update" => "更新",
+        "Delete" => "刪除",
+        "Login" => "登入",
+        "Logout" => "登出",
+        _ => action
+    };
+
+    private void ShowDetails(AuditLog log)
+    {
+        // 顯示詳細資訊 Dialog
+    }
+}

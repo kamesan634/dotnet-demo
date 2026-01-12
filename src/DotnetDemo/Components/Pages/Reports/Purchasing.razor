@@ -1,0 +1,108 @@
+@page "/reports/purchasing"
+@attribute [Authorize]
+@using DotnetDemo.Services.Interfaces
+@inject IReportService ReportService
+
+<PageTitle>採購報表 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">採購報表</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <MudDateRangePicker Label="日期範圍" @bind-DateRange="_dateRange" Variant="Variant.Outlined" />
+    </MudItem>
+    <MudItem xs="12" md="6" Class="d-flex align-end">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadReportAsync"
+                   StartIcon="@Icons.Material.Filled.Search">查詢</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Class="ml-2"
+                   StartIcon="@Icons.Material.Filled.Download">匯出 Excel</MudButton>
+    </MudItem>
+</MudGrid>
+
+<MudGrid Class="mt-4">
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard>
+            <MudCardContent>
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">採購總額</MudText>
+                <MudText Typo="Typo.h4">$@_summary.TotalAmount.ToString("N0")</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard>
+            <MudCardContent>
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">採購單數</MudText>
+                <MudText Typo="Typo.h4">@_summary.TotalOrders</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard>
+            <MudCardContent>
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">待處理採購單</MudText>
+                <MudText Typo="Typo.h4" Color="Color.Warning">@_summary.PendingOrders</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard>
+            <MudCardContent>
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">已完成採購單</MudText>
+                <MudText Typo="Typo.h4" Color="Color.Success">@_summary.CompletedOrders</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<MudCard Class="mt-4">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">供應商採購統計</MudText>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_summary.TopSuppliers" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>供應商</MudTh>
+                <MudTh>採購單數</MudTh>
+                <MudTh>採購金額</MudTh>
+                <MudTh>佔比</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.SupplierName</MudTd>
+                <MudTd>@context.OrderCount</MudTd>
+                <MudTd>$@context.TotalAmount.ToString("N0")</MudTd>
+                <MudTd>
+                    @{
+                        var percentage = _summary.TotalAmount > 0 ? (double)(context.TotalAmount / _summary.TotalAmount * 100) : 0;
+                    }
+                    <MudProgressLinear Value="@percentage" Color="Color.Primary" Size="Size.Medium" />
+                    <MudText Typo="Typo.caption">@percentage.ToString("N1")%</MudText>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private DateRange _dateRange = new(DateTime.Today.AddDays(-30), DateTime.Today);
+    private PurchasingSummary _summary = new();
+    private bool _loading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReportAsync();
+    }
+
+    private async Task LoadReportAsync()
+    {
+        _loading = true;
+
+        var startDate = _dateRange.Start ?? DateTime.Today.AddDays(-30);
+        var endDate = _dateRange.End ?? DateTime.Today;
+
+        _summary = await ReportService.GetPurchasingSummaryAsync(startDate, endDate);
+
+        _loading = false;
+    }
+}

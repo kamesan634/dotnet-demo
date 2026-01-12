@@ -1,0 +1,85 @@
+@page "/users"
+@attribute [Authorize(Roles = "Admin")]
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+@inject UserManager<ApplicationUser> UserManager
+@inject ISnackbar Snackbar
+
+<PageTitle>使用者管理 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">使用者管理</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">使用者列表</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd">
+                新增使用者
+            </MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_users" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>帳號</MudTh>
+                <MudTh>姓名</MudTh>
+                <MudTh>Email</MudTh>
+                <MudTh>門市</MudTh>
+                <MudTh>狀態</MudTh>
+                <MudTh>最後登入</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.UserName</MudTd>
+                <MudTd>@context.DisplayName</MudTd>
+                <MudTd>@context.Email</MudTd>
+                <MudTd>@context.Store?.Name</MudTd>
+                <MudTd>
+                    <MudChip Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Default)">
+                        @(context.IsActive ? "啟用" : "停用")
+                    </MudChip>
+                </MudTd>
+                <MudTd>@context.LastLoginAt?.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Color="Color.Warning"
+                                   OnClick="@(() => ResetPassword(context))" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<ApplicationUser> _users = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        _users = await DbContext.Users
+            .Include(u => u.Store)
+            .OrderBy(u => u.UserName)
+            .ToListAsync();
+        _loading = false;
+    }
+
+    private async Task ResetPassword(ApplicationUser user)
+    {
+        var token = await UserManager.GeneratePasswordResetTokenAsync(user);
+        var result = await UserManager.ResetPasswordAsync(user, token, "password123");
+
+        if (result.Succeeded)
+        {
+            Snackbar.Add($"使用者 {user.UserName} 的密碼已重設為 password123", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add("密碼重設失敗", Severity.Error);
+        }
+    }
+}

@@ -1,0 +1,71 @@
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+
+<MudDialog>
+    <DialogContent>
+        <EditForm Model="@Supplier">
+            <DataAnnotationsValidator />
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Supplier.Code" Label="供應商代碼" Required="true" Disabled="@(!IsNew)" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Supplier.TaxId" Label="統一編號" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Supplier.Name" Label="供應商名稱" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Supplier.ContactName" Label="聯絡人" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Supplier.Phone" Label="電話" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Supplier.Email" Label="電子郵件" InputType="InputType.Email" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Supplier.Address" Label="地址" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="Supplier.PaymentTermDays" Label="付款條件 (天)" Min="0" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSwitch T="bool" @bind-Value="Supplier.IsActive" Label="啟用" Color="Color.Primary" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Supplier.Notes" Label="備註" Lines="2" />
+                </MudItem>
+            </MudGrid>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">儲存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public Supplier Supplier { get; set; } = new();
+    [Parameter] public bool IsNew { get; set; }
+
+    private async Task SaveAsync()
+    {
+        if (IsNew)
+        {
+            Supplier.CreatedAt = DateTime.UtcNow;
+            DbContext.Suppliers.Add(Supplier);
+        }
+        else
+        {
+            Supplier.UpdatedAt = DateTime.UtcNow;
+            DbContext.Suppliers.Update(Supplier);
+        }
+
+        await DbContext.SaveChangesAsync();
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

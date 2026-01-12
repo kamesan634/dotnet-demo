@@ -1,0 +1,76 @@
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+
+<MudDialog>
+    <DialogContent>
+        <EditForm Model="@Category">
+            <DataAnnotationsValidator />
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Category.Code" Label="分類代碼" Required="true"
+                                  RequiredError="請輸入分類代碼" Disabled="@(!IsNew)" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Category.Name" Label="分類名稱" Required="true"
+                                  RequiredError="請輸入分類名稱" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSelect T="int?" @bind-Value="Category.ParentId" Label="父分類" Clearable="true">
+                        @foreach (var parent in _parentCategories)
+                        {
+                            <MudSelectItem Value="@((int?)parent.Id)">@parent.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudNumericField @bind-Value="Category.SortOrder" Label="排序" Min="0" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSwitch T="bool" @bind-Value="Category.IsActive" Label="啟用" Color="Color.Primary" />
+                </MudItem>
+            </MudGrid>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">儲存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public Category Category { get; set; } = new();
+    [Parameter] public bool IsNew { get; set; }
+
+    private List<Category> _parentCategories = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _parentCategories = await DbContext.Categories
+            .Where(c => c.Level == 1 && c.IsActive && c.Id != Category.Id)
+            .OrderBy(c => c.Name)
+            .ToListAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        Category.Level = Category.ParentId.HasValue ? 2 : 1;
+
+        if (IsNew)
+        {
+            Category.CreatedAt = DateTime.UtcNow;
+            DbContext.Categories.Add(Category);
+        }
+        else
+        {
+            Category.UpdatedAt = DateTime.UtcNow;
+            DbContext.Categories.Update(Category);
+        }
+
+        await DbContext.SaveChangesAsync();
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

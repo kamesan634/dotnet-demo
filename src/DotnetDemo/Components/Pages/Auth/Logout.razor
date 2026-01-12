@@ -1,0 +1,22 @@
+@page "/logout"
+@inject NavigationManager Navigation
+
+<PageTitle>登出中...</PageTitle>
+
+<MudGrid Justify="Justify.Center" Class="mt-16">
+    <MudItem xs="12" sm="6" md="4">
+        <MudCard>
+            <MudCardContent Class="text-center py-8">
+                <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
+                <MudText Typo="Typo.h6" Class="mt-4">正在登出...</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Navigation.NavigateTo("/api/auth/logout", forceLoad: true);
+    }
+}

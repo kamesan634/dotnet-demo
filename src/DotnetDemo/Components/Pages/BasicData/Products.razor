@@ -1,0 +1,206 @@
+@page "/products"
+@attribute [Authorize]
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>商品管理 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">商品管理</MudText>
+
+<MudCard Class="mb-4">
+    <MudCardContent>
+        <MudGrid>
+            <MudItem xs="12" sm="4">
+                <MudTextField @bind-Value="_searchText" Label="搜尋" Placeholder="商品名稱/代碼/條碼"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Immediate="true" OnKeyUp="@(e => { if (e.Key == "Enter") SearchAsync(); })" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudSelect T="int?" @bind-Value="_selectedCategoryId" Label="分類" Clearable="true">
+                    @foreach (var category in _categories)
+                    {
+                        <MudSelectItem Value="@((int?)category.Id)">@category.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudSelect T="bool?" @bind-Value="_isActive" Label="狀態" Clearable="true">
+                    <MudSelectItem Value="@((bool?)true)">啟用</MudSelectItem>
+                    <MudSelectItem Value="@((bool?)false)">停用</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="2" Class="d-flex align-end">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SearchAsync" Class="mr-2">搜尋</MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="ResetSearch">重置</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudCardContent>
+</MudCard>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">商品列表</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAddDialog">新增商品</MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_products" Dense="true" Hover="true" Loading="@_loading" LoadingProgressColor="Color.Info"
+                  Breakpoint="Breakpoint.Sm">
+            <HeaderContent>
+                <MudTh>代碼</MudTh>
+                <MudTh>條碼</MudTh>
+                <MudTh>名稱</MudTh>
+                <MudTh>分類</MudTh>
+                <MudTh>售價</MudTh>
+                <MudTh>成本</MudTh>
+                <MudTh>狀態</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="代碼">@context.Code</MudTd>
+                <MudTd DataLabel="條碼">@context.Barcode</MudTd>
+                <MudTd DataLabel="名稱">@context.Name</MudTd>
+                <MudTd DataLabel="分類">@context.Category?.Name</MudTd>
+                <MudTd DataLabel="售價">@context.SellingPrice.ToString("C0")</MudTd>
+                <MudTd DataLabel="成本">@context.CostPrice.ToString("C0")</MudTd>
+                <MudTd DataLabel="狀態">
+                    <MudChip Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Default)">
+                        @(context.IsActive ? "啟用" : "停用")
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="操作">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => OpenEditDialog(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="@(() => DeleteProduct(context))" />
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText>沒有符合條件的商品</MudText>
+            </NoRecordsContent>
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+            </PagerContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<Product> _products = new();
+    private List<Category> _categories = new();
+    private bool _loading = true;
+    private string? _searchText;
+    private int? _selectedCategoryId;
+    private bool? _isActive;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _categories = await DbContext.Categories.Where(c => c.IsActive).OrderBy(c => c.Name).ToListAsync();
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        _loading = true;
+        try
+        {
+            var query = DbContext.Products
+                .Include(p => p.Category)
+                .Include(p => p.Unit)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(_searchText))
+            {
+                query = query.Where(p =>
+                    p.Name.Contains(_searchText) ||
+                    p.Code.Contains(_searchText) ||
+                    (p.Barcode != null && p.Barcode.Contains(_searchText)));
+            }
+
+            if (_selectedCategoryId.HasValue)
+            {
+                query = query.Where(p => p.CategoryId == _selectedCategoryId.Value);
+            }
+
+            if (_isActive.HasValue)
+            {
+                query = query.Where(p => p.IsActive == _isActive.Value);
+            }
+
+            _products = await query.OrderBy(p => p.Code).ToListAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ResetSearch()
+    {
+        _searchText = null;
+        _selectedCategoryId = null;
+        _isActive = null;
+        _ = SearchAsync();
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            ["Product"] = new Product(),
+            ["IsNew"] = true
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ProductDialog>("新增商品", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await SearchAsync();
+            Snackbar.Add("商品新增成功", Severity.Success);
+        }
+    }
+
+    private async Task OpenEditDialog(Product product)
+    {
+        var parameters = new DialogParameters
+        {
+            ["Product"] = product,
+            ["IsNew"] = false
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ProductDialog>("編輯商品", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await SearchAsync();
+            Snackbar.Add("商品更新成功", Severity.Success);
+        }
+    }
+
+    private async Task DeleteProduct(Product product)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "確認刪除",
+            $"確定要刪除商品「{product.Name}」嗎？",
+            yesText: "刪除", cancelText: "取消");
+
+        if (result == true)
+        {
+            DbContext.Products.Remove(product);
+            await DbContext.SaveChangesAsync();
+            await SearchAsync();
+            Snackbar.Add("商品已刪除", Severity.Success);
+        }
+    }
+}

@@ -1,0 +1,59 @@
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+
+<MudDialog>
+    <DialogContent>
+        <EditForm Model="@Store">
+            <DataAnnotationsValidator />
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Store.Code" Label="門市代碼" Required="true" Disabled="@(!IsNew)" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Store.Name" Label="門市名稱" Required="true" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Store.Address" Label="地址" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Store.Phone" Label="電話" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSwitch T="bool" @bind-Value="Store.IsPrimary" Label="主要門市" Color="Color.Warning" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSwitch T="bool" @bind-Value="Store.IsActive" Label="啟用" Color="Color.Primary" />
+                </MudItem>
+            </MudGrid>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">儲存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public Store Store { get; set; } = new();
+    [Parameter] public bool IsNew { get; set; }
+
+    private async Task SaveAsync()
+    {
+        if (IsNew)
+        {
+            Store.CreatedAt = DateTime.UtcNow;
+            DbContext.Stores.Add(Store);
+        }
+        else
+        {
+            Store.UpdatedAt = DateTime.UtcNow;
+            DbContext.Stores.Update(Store);
+        }
+
+        await DbContext.SaveChangesAsync();
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

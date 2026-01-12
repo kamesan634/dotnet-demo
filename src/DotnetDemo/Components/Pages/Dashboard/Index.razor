@@ -1,0 +1,242 @@
+@page "/"
+@page "/dashboard"
+@attribute [Authorize]
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+
+<PageTitle>儀表板 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">儀表板</MudText>
+
+<MudGrid>
+    @* KPI 卡片 *@
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard>
+            <MudCardContent>
+                <div class="d-flex justify-space-between align-center">
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">今日銷售額</MudText>
+                        <MudText Typo="Typo.h5">@_todaySales.ToString("C0")</MudText>
+                    </div>
+                    <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Color="Color.Success" Size="Size.Large" />
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard>
+            <MudCardContent>
+                <div class="d-flex justify-space-between align-center">
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">今日訂單數</MudText>
+                        <MudText Typo="Typo.h5">@_todayOrders</MudText>
+                    </div>
+                    <MudIcon Icon="@Icons.Material.Filled.Receipt" Color="Color.Primary" Size="Size.Large" />
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard>
+            <MudCardContent>
+                <div class="d-flex justify-space-between align-center">
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">商品總數</MudText>
+                        <MudText Typo="Typo.h5">@_totalProducts</MudText>
+                    </div>
+                    <MudIcon Icon="@Icons.Material.Filled.Inventory" Color="Color.Info" Size="Size.Large" />
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard>
+            <MudCardContent>
+                <div class="d-flex justify-space-between align-center">
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">低庫存警示</MudText>
+                        <MudText Typo="Typo.h5" Color="@(_lowStockCount > 0 ? Color.Error : Color.Default)">@_lowStockCount</MudText>
+                    </div>
+                    <MudIcon Icon="@Icons.Material.Filled.Warning" Color="@(_lowStockCount > 0 ? Color.Error : Color.Default)" Size="Size.Large" />
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    @* 低庫存商品 *@
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">
+                        <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Class="mr-2" />
+                        低庫存警示
+                    </MudText>
+                </CardHeaderContent>
+                <CardHeaderActions>
+                    <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Default" OnClick="LoadDataAsync" />
+                </CardHeaderActions>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (_lowStockProducts.Any())
+                {
+                    <MudSimpleTable Dense="true" Hover="true">
+                        <thead>
+                            <tr>
+                                <th>商品名稱</th>
+                                <th>庫存</th>
+                                <th>安全庫存</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in _lowStockProducts)
+                            {
+                                <tr>
+                                    <td>@item.ProductName</td>
+                                    <td>
+                                        <MudChip Size="Size.Small" Color="Color.Error">@item.Quantity</MudChip>
+                                    </td>
+                                    <td>@item.SafetyStock</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+                else
+                {
+                    <MudText Color="Color.Success">目前沒有低庫存商品</MudText>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    @* 最近訂單 *@
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">
+                        <MudIcon Icon="@Icons.Material.Filled.Receipt" Color="Color.Primary" Class="mr-2" />
+                        最近訂單
+                    </MudText>
+                </CardHeaderContent>
+                <CardHeaderActions>
+                    <MudButton Href="/orders" Variant="Variant.Text" Color="Color.Primary" Size="Size.Small">查看全部</MudButton>
+                </CardHeaderActions>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (_recentOrders.Any())
+                {
+                    <MudSimpleTable Dense="true" Hover="true">
+                        <thead>
+                            <tr>
+                                <th>訂單編號</th>
+                                <th>金額</th>
+                                <th>狀態</th>
+                                <th>時間</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var order in _recentOrders)
+                            {
+                                <tr>
+                                    <td>@order.OrderNumber</td>
+                                    <td>@order.TotalAmount.ToString("C0")</td>
+                                    <td>
+                                        <MudChip Size="Size.Small" Color="@GetStatusColor(order.Status)">
+                                            @GetStatusText(order.Status)
+                                        </MudChip>
+                                    </td>
+                                    <td>@order.CreatedAt.ToLocalTime().ToString("MM/dd HH:mm")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+                else
+                {
+                    <MudText Color="Color.Secondary">目前沒有訂單</MudText>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private decimal _todaySales;
+    private int _todayOrders;
+    private int _totalProducts;
+    private int _lowStockCount;
+    private List<LowStockItem> _lowStockProducts = new();
+    private List<Order> _recentOrders = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        var today = DateTime.UtcNow.Date;
+
+        // 今日銷售
+        var todayOrdersQuery = DbContext.Orders
+            .Where(o => o.CreatedAt >= today && o.Status == OrderStatus.Completed);
+        _todaySales = await todayOrdersQuery.SumAsync(o => (decimal?)o.TotalAmount) ?? 0;
+        _todayOrders = await todayOrdersQuery.CountAsync();
+
+        // 商品總數
+        _totalProducts = await DbContext.Products.CountAsync(p => p.IsActive);
+
+        // 低庫存
+        _lowStockProducts = await DbContext.Inventories
+            .Include(i => i.Product)
+            .Where(i => i.Quantity < i.Product.SafetyStock && i.Product.IsActive)
+            .Select(i => new LowStockItem
+            {
+                ProductName = i.Product.Name,
+                Quantity = i.Quantity,
+                SafetyStock = i.Product.SafetyStock
+            })
+            .Take(10)
+            .ToListAsync();
+        _lowStockCount = _lowStockProducts.Count;
+
+        // 最近訂單
+        _recentOrders = await DbContext.Orders
+            .OrderByDescending(o => o.CreatedAt)
+            .Take(10)
+            .ToListAsync();
+    }
+
+    private Color GetStatusColor(OrderStatus status) => status switch
+    {
+        OrderStatus.Completed => Color.Success,
+        OrderStatus.Pending => Color.Warning,
+        OrderStatus.Confirmed => Color.Info,
+        OrderStatus.Cancelled => Color.Error,
+        OrderStatus.Refunded => Color.Secondary,
+        _ => Color.Default
+    };
+
+    private string GetStatusText(OrderStatus status) => status switch
+    {
+        OrderStatus.Pending => "待處理",
+        OrderStatus.Confirmed => "已確認",
+        OrderStatus.Completed => "已完成",
+        OrderStatus.Cancelled => "已取消",
+        OrderStatus.Refunded => "已退貨",
+        _ => status.ToString()
+    };
+
+    private class LowStockItem
+    {
+        public string ProductName { get; set; } = string.Empty;
+        public int Quantity { get; set; }
+        public int SafetyStock { get; set; }
+    }
+}

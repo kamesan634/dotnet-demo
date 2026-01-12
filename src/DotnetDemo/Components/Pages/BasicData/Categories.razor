@@ -1,0 +1,150 @@
+@page "/categories"
+@attribute [Authorize]
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>分類管理 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">分類管理</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">分類列表</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAddDialog">新增分類</MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_categories" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>代碼</MudTh>
+                <MudTh>名稱</MudTh>
+                <MudTh>父分類</MudTh>
+                <MudTh>層級</MudTh>
+                <MudTh>排序</MudTh>
+                <MudTh>狀態</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="代碼">@context.Code</MudTd>
+                <MudTd DataLabel="名稱">
+                    @if (context.Level > 1)
+                    {
+                        <span style="margin-left: @((context.Level - 1) * 20)px">└ @context.Name</span>
+                    }
+                    else
+                    {
+                        @context.Name
+                    }
+                </MudTd>
+                <MudTd DataLabel="父分類">@context.Parent?.Name</MudTd>
+                <MudTd DataLabel="層級">@context.Level</MudTd>
+                <MudTd DataLabel="排序">@context.SortOrder</MudTd>
+                <MudTd DataLabel="狀態">
+                    <MudChip Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Default)">
+                        @(context.IsActive ? "啟用" : "停用")
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="操作">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => OpenEditDialog(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="@(() => DeleteCategory(context))" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<Category> _categories = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        try
+        {
+            _categories = await DbContext.Categories
+                .Include(c => c.Parent)
+                .OrderBy(c => c.Level)
+                .ThenBy(c => c.SortOrder)
+                .ToListAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            ["Category"] = new Category(),
+            ["IsNew"] = true
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<CategoryDialog>("新增分類", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadDataAsync();
+            Snackbar.Add("分類新增成功", Severity.Success);
+        }
+    }
+
+    private async Task OpenEditDialog(Category category)
+    {
+        var parameters = new DialogParameters
+        {
+            ["Category"] = category,
+            ["IsNew"] = false
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<CategoryDialog>("編輯分類", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadDataAsync();
+            Snackbar.Add("分類更新成功", Severity.Success);
+        }
+    }
+
+    private async Task DeleteCategory(Category category)
+    {
+        if (category.Children?.Any() == true || await DbContext.Products.AnyAsync(p => p.CategoryId == category.Id))
+        {
+            Snackbar.Add("無法刪除有子分類或商品的分類", Severity.Error);
+            return;
+        }
+
+        var result = await DialogService.ShowMessageBox(
+            "確認刪除",
+            $"確定要刪除分類「{category.Name}」嗎？",
+            yesText: "刪除", cancelText: "取消");
+
+        if (result == true)
+        {
+            DbContext.Categories.Remove(category);
+            await DbContext.SaveChangesAsync();
+            await LoadDataAsync();
+            Snackbar.Add("分類已刪除", Severity.Success);
+        }
+    }
+}

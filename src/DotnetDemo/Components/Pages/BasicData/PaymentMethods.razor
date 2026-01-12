@@ -1,0 +1,129 @@
+@page "/payment-methods"
+@attribute [Authorize]
+@using Microsoft.EntityFrameworkCore
+@using DotnetDemo.Data
+@inject ApplicationDbContext DbContext
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>付款方式管理 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">付款方式管理</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">付款方式列表</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAddDialog">新增付款方式</MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_paymentMethods" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>代碼</MudTh>
+                <MudTh>名稱</MudTh>
+                <MudTh>需找零</MudTh>
+                <MudTh>排序</MudTh>
+                <MudTh>狀態</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="代碼">@context.Code</MudTd>
+                <MudTd DataLabel="名稱">@context.Name</MudTd>
+                <MudTd DataLabel="需找零">
+                    <MudIcon Icon="@(context.RequiresChange ? Icons.Material.Filled.Check : Icons.Material.Filled.Close)"
+                             Color="@(context.RequiresChange ? Color.Success : Color.Default)" Size="Size.Small" />
+                </MudTd>
+                <MudTd DataLabel="排序">@context.SortOrder</MudTd>
+                <MudTd DataLabel="狀態">
+                    <MudChip Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Default)">
+                        @(context.IsActive ? "啟用" : "停用")
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="操作">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => OpenEditDialog(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="@(() => DeletePaymentMethod(context))" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<PaymentMethod> _paymentMethods = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        _paymentMethods = await DbContext.PaymentMethods.OrderBy(p => p.SortOrder).ToListAsync();
+        _loading = false;
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var parameters = new DialogParameters<PaymentMethodDialog>
+        {
+            { x => x.PaymentMethod, new PaymentMethod() },
+            { x => x.IsNew, true }
+        };
+
+        var dialog = await DialogService.ShowAsync<PaymentMethodDialog>("新增付款方式", parameters);
+        var result = await dialog.Result;
+
+        if (!result!.Canceled)
+        {
+            await LoadDataAsync();
+            Snackbar.Add("付款方式已新增", Severity.Success);
+        }
+    }
+
+    private async Task OpenEditDialog(PaymentMethod paymentMethod)
+    {
+        var parameters = new DialogParameters<PaymentMethodDialog>
+        {
+            { x => x.PaymentMethod, paymentMethod },
+            { x => x.IsNew, false }
+        };
+
+        var dialog = await DialogService.ShowAsync<PaymentMethodDialog>("編輯付款方式", parameters);
+        var result = await dialog.Result;
+
+        if (!result!.Canceled)
+        {
+            await LoadDataAsync();
+            Snackbar.Add("付款方式已更新", Severity.Success);
+        }
+    }
+
+    private async Task DeletePaymentMethod(PaymentMethod paymentMethod)
+    {
+        if (await DbContext.OrderPayments.AnyAsync(op => op.PaymentMethodId == paymentMethod.Id))
+        {
+            Snackbar.Add("無法刪除已被使用的付款方式", Severity.Error);
+            return;
+        }
+
+        var result = await DialogService.ShowMessageBox(
+            "確認刪除", $"確定要刪除付款方式「{paymentMethod.Name}」嗎？",
+            yesText: "刪除", cancelText: "取消");
+
+        if (result == true)
+        {
+            DbContext.PaymentMethods.Remove(paymentMethod);
+            await DbContext.SaveChangesAsync();
+            await LoadDataAsync();
+            Snackbar.Add("付款方式已刪除", Severity.Success);
+        }
+    }
+}
