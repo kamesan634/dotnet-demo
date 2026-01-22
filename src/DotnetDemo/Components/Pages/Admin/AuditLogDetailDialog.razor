@@ -1,0 +1,81 @@
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.caption" Color="Color.Primary">時間</MudText>
+                <MudText>@Log.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.caption" Color="Color.Primary">使用者</MudText>
+                <MudText>@Log.UserName</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.caption" Color="Color.Primary">操作類型</MudText>
+                <MudText>@Log.Action</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.caption" Color="Color.Primary">實體類型</MudText>
+                <MudText>@Log.EntityType</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.caption" Color="Color.Primary">實體 ID</MudText>
+                <MudText>@Log.EntityId</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.caption" Color="Color.Primary">IP 位址</MudText>
+                <MudText>@Log.IpAddress</MudText>
+            </MudItem>
+            @if (!string.IsNullOrEmpty(Log.OldValues))
+            {
+                <MudItem xs="12">
+                    <MudText Typo="Typo.caption" Color="Color.Primary">舊值</MudText>
+                    <MudPaper Class="pa-2" Outlined="true">
+                        <pre style="white-space: pre-wrap; word-break: break-all;">@FormatJson(Log.OldValues)</pre>
+                    </MudPaper>
+                </MudItem>
+            }
+            @if (!string.IsNullOrEmpty(Log.NewValues))
+            {
+                <MudItem xs="12">
+                    <MudText Typo="Typo.caption" Color="Color.Primary">新值</MudText>
+                    <MudPaper Class="pa-2" Outlined="true">
+                        <pre style="white-space: pre-wrap; word-break: break-all;">@FormatJson(Log.NewValues)</pre>
+                    </MudPaper>
+                </MudItem>
+            }
+            @if (!string.IsNullOrEmpty(Log.UserAgent))
+            {
+                <MudItem xs="12">
+                    <MudText Typo="Typo.caption" Color="Color.Primary">User Agent</MudText>
+                    <MudText Style="word-break: break-all;">@Log.UserAgent</MudText>
+                </MudItem>
+            }
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close" Color="Color.Primary">關閉</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public AuditLog Log { get; set; } = new();
+
+    private void Close() => MudDialog.Close();
+
+    private string FormatJson(string json)
+    {
+        try
+        {
+            var obj = System.Text.Json.JsonSerializer.Deserialize<object>(json);
+            return System.Text.Json.JsonSerializer.Serialize(obj, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+        }
+        catch
+        {
+            return json;
+        }
+    }
+}

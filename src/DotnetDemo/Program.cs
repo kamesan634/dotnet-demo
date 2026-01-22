@@ -78,7 +78,32 @@ try
     builder.Services.AddScoped<IInventoryService, InventoryService>();
     builder.Services.AddScoped<IOrderService, OrderService>();
     builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
+    builder.Services.AddScoped<IPurchaseReceiptService, PurchaseReceiptService>();
     builder.Services.AddScoped<IReportService, ReportService>();
+    builder.Services.AddScoped<IStoreService, StoreService>();
+    builder.Services.AddScoped<IUnitService, UnitService>();
+    builder.Services.AddScoped<IWarehouseService, WarehouseService>();
+    builder.Services.AddScoped<IPaymentMethodService, PaymentMethodService>();
+    builder.Services.AddScoped<ICustomerLevelService, CustomerLevelService>();
+    builder.Services.AddScoped<IStockAdjustmentService, StockAdjustmentService>();
+    builder.Services.AddScoped<IStockTransferService, StockTransferService>();
+    builder.Services.AddScoped<IUserService, UserService>();
+    builder.Services.AddScoped<IRoleService, RoleService>();
+    builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+
+    // Phase 5 新增服務
+    builder.Services.AddScoped<ITaxSettingService, TaxSettingService>();
+    builder.Services.AddScoped<INumberingRuleService, NumberingRuleService>();
+    builder.Services.AddScoped<ISystemSettingService, SystemSettingService>();
+    builder.Services.AddScoped<IPromotionService, PromotionService>();
+    builder.Services.AddScoped<ICashierShiftService, CashierShiftService>();
+    builder.Services.AddScoped<IInvoiceService, InvoiceService>();
+    builder.Services.AddScoped<IHeldOrderService, HeldOrderService>();
+    builder.Services.AddScoped<IStockCountService, StockCountService>();
+    builder.Services.AddScoped<IPurchaseReturnService, PurchaseReturnService>();
+    builder.Services.AddScoped<IProductBundleService, ProductBundleService>();
+    builder.Services.AddScoped<IReportScheduleService, ReportScheduleService>();
+    builder.Services.AddScoped<IExportService, ExportService>();
 
     // 配置 MudBlazor
     builder.Services.AddMudServices(config =>

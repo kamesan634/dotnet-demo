@@ -1,0 +1,169 @@
+@page "/reports/schedules"
+@attribute [Authorize(Roles = "Admin,Manager")]
+@using Microsoft.AspNetCore.Identity
+@using DotnetDemo.Services.Interfaces
+@inject IReportScheduleService ReportScheduleService
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>報表排程 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">報表排程</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">排程列表</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAddDialog">
+                新增排程
+            </MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_schedules" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>名稱</MudTh>
+                <MudTh>報表類型</MudTh>
+                <MudTh>執行頻率</MudTh>
+                <MudTh>執行時間</MudTh>
+                <MudTh>收件人</MudTh>
+                <MudTh>上次執行</MudTh>
+                <MudTh>下次執行</MudTh>
+                <MudTh>狀態</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Name</MudTd>
+                <MudTd>@GetReportTypeName(context.ReportType)</MudTd>
+                <MudTd>@GetFrequencyName(context.Frequency)</MudTd>
+                <MudTd>@context.ExecutionTime</MudTd>
+                <MudTd>
+                    <MudTooltip Text="@context.Recipients">
+                        <MudText>@TruncateEmail(context.Recipients)</MudText>
+                    </MudTooltip>
+                </MudTd>
+                <MudTd>@context.LastExecutedAt?.ToString("MM/dd HH:mm")</MudTd>
+                <MudTd>@context.NextExecutionAt?.ToString("MM/dd HH:mm")</MudTd>
+                <MudTd>
+                    <MudChip Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Default)">
+                        @(context.IsActive ? "啟用" : "停用")
+                    </MudChip>
+                </MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => OpenEditDialog(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="@(() => Delete(context))" />
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText>尚無排程</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<ReportSchedule> _schedules = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        _schedules = await ReportScheduleService.GetAllAsync();
+        _loading = false;
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "Schedule", new ReportSchedule { IsActive = true, ExecutionTime = "08:00", ExportFormat = "Excel" } },
+            { "IsNew", true }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ReportScheduleDialog>("新增報表排程", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadDataAsync();
+            Snackbar.Add("排程已新增", Severity.Success);
+        }
+    }
+
+    private async Task OpenEditDialog(ReportSchedule schedule)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Schedule", schedule },
+            { "IsNew", false }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ReportScheduleDialog>("編輯報表排程", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadDataAsync();
+            Snackbar.Add("排程已更新", Severity.Success);
+        }
+    }
+
+    private async Task Delete(ReportSchedule schedule)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "確認刪除", $"確定要刪除排程「{schedule.Name}」嗎？",
+            yesText: "刪除", cancelText: "取消");
+
+        if (result == true)
+        {
+            var success = await ReportScheduleService.DeleteAsync(schedule.Id);
+            if (success)
+            {
+                await LoadDataAsync();
+                Snackbar.Add("排程已刪除", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("刪除失敗", Severity.Error);
+            }
+        }
+    }
+
+    private string GetReportTypeName(string type) => type switch
+    {
+        "Sales" => "銷售報表",
+        "Inventory" => "庫存報表",
+        "Purchasing" => "採購報表",
+        "Profit" => "利潤報表",
+        _ => type
+    };
+
+    private string GetFrequencyName(ReportFrequency frequency) => frequency switch
+    {
+        ReportFrequency.Daily => "每日",
+        ReportFrequency.Weekly => "每週",
+        ReportFrequency.Monthly => "每月",
+        _ => "未知"
+    };
+
+    private string TruncateEmail(string emails)
+    {
+        if (string.IsNullOrEmpty(emails)) return "-";
+        var first = emails.Split(',').FirstOrDefault()?.Trim() ?? "";
+        return emails.Contains(',') ? $"{first}..." : first;
+    }
+}

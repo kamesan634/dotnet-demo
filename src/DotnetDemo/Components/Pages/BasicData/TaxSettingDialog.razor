@@ -1,0 +1,63 @@
+@using DotnetDemo.Services.Interfaces
+@inject ITaxSettingService TaxSettingService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(IsNew ? "新增稅別" : "編輯稅別")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudTextField @bind-Value="TaxSetting.Code" Label="代碼" Required="true"
+                          RequiredError="請輸入代碼" Variant="Variant.Outlined" Class="mb-3" />
+            <MudTextField @bind-Value="TaxSetting.Name" Label="名稱" Required="true"
+                          RequiredError="請輸入名稱" Variant="Variant.Outlined" Class="mb-3" />
+            <MudNumericField @bind-Value="TaxSetting.Rate" Label="稅率" Format="P2"
+                             Min="0" Max="1" Step="0.01M"
+                             Variant="Variant.Outlined" Class="mb-3" />
+            <MudTextField @bind-Value="TaxSetting.Description" Label="說明" Lines="2"
+                          Variant="Variant.Outlined" Class="mb-3" />
+            <MudCheckBox T="bool" @bind-Value="TaxSetting.IsInclusive" Label="內含稅" Class="mb-3" />
+            <MudCheckBox T="bool" @bind-Value="TaxSetting.IsDefault" Label="設為預設" Class="mb-3" />
+            <MudCheckBox T="bool" @bind-Value="TaxSetting.IsActive" Label="啟用" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@(!_isValid)">
+            @(IsNew ? "新增" : "儲存")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public TaxSetting TaxSetting { get; set; } = new();
+
+    [Parameter]
+    public bool IsNew { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        if (IsNew)
+        {
+            await TaxSettingService.CreateAsync(TaxSetting);
+        }
+        else
+        {
+            await TaxSettingService.UpdateAsync(TaxSetting);
+        }
+
+        MudDialog.Close(DialogResult.Ok(TaxSetting));
+    }
+}

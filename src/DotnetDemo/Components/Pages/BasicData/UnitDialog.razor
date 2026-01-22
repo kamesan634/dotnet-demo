@@ -1,0 +1,56 @@
+@using DotnetDemo.Services.Interfaces
+@inject IUnitService UnitService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <EditForm Model="@Unit" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Unit.Code" Label="單位代碼" Required="true"
+                                  RequiredError="請輸入單位代碼" Disabled="@(!IsNew)" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Unit.Name" Label="單位名稱" Required="true"
+                                  RequiredError="請輸入單位名稱" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSwitch T="bool" @bind-Value="Unit.IsActive" Label="啟用" Color="Color.Primary" />
+                </MudItem>
+            </MudGrid>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">儲存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public Unit Unit { get; set; } = new();
+    [Parameter] public bool IsNew { get; set; }
+
+    private async Task SaveAsync()
+    {
+        if (IsNew)
+        {
+            // 檢查代碼是否重複
+            if (await UnitService.CodeExistsAsync(Unit.Code))
+            {
+                Snackbar.Add("單位代碼已存在", Severity.Error);
+                return;
+            }
+            await UnitService.CreateAsync(Unit);
+        }
+        else
+        {
+            await UnitService.UpdateAsync(Unit);
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

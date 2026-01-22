@@ -1,0 +1,88 @@
+@using DotnetDemo.Services.Interfaces
+@inject INumberingRuleService NumberingRuleService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(IsNew ? "新增編號規則" : "編輯編號規則")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudTextField @bind-Value="Rule.Name" Label="規則名稱" Required="true"
+                          RequiredError="請輸入名稱" Variant="Variant.Outlined" Class="mb-3" />
+            <MudSelect T="string" @bind-Value="Rule.DocumentType" Label="單據類型" Required="true"
+                       RequiredError="請選擇單據類型" Variant="Variant.Outlined" Class="mb-3"
+                       Disabled="@(!IsNew)">
+                <MudSelectItem Value="@("Order")">訂單</MudSelectItem>
+                <MudSelectItem Value="@("PurchaseOrder")">採購單</MudSelectItem>
+                <MudSelectItem Value="@("StockTransfer")">調撥單</MudSelectItem>
+                <MudSelectItem Value="@("StockAdjustment")">調整單</MudSelectItem>
+                <MudSelectItem Value="@("Invoice")">發票</MudSelectItem>
+                <MudSelectItem Value="@("PurchaseReceipt")">進貨單</MudSelectItem>
+            </MudSelect>
+            <MudTextField @bind-Value="Rule.Prefix" Label="前綴" Required="true"
+                          RequiredError="請輸入前綴" Variant="Variant.Outlined" Class="mb-3" />
+            <MudTextField @bind-Value="Rule.DateFormat" Label="日期格式" HelperText="例如: yyyyMMdd, yyMM"
+                          Variant="Variant.Outlined" Class="mb-3" />
+            <MudNumericField @bind-Value="Rule.SequenceLength" Label="流水號長度"
+                             Min="1" Max="10" Variant="Variant.Outlined" Class="mb-3" />
+            <MudSelect T="string" @bind-Value="Rule.ResetPeriod" Label="重置週期"
+                       Variant="Variant.Outlined" Class="mb-3">
+                <MudSelectItem Value="@("Daily")">每日</MudSelectItem>
+                <MudSelectItem Value="@("Monthly")">每月</MudSelectItem>
+                <MudSelectItem Value="@("Yearly")">每年</MudSelectItem>
+                <MudSelectItem Value="@("Never")">不重置</MudSelectItem>
+            </MudSelect>
+            <MudCheckBox T="bool" @bind-Value="Rule.IsActive" Label="啟用" />
+
+            <MudText Typo="Typo.body2" Class="mt-3">
+                預覽編號格式：<strong>@GetPreview()</strong>
+            </MudText>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@(!_isValid)">
+            @(IsNew ? "新增" : "儲存")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public NumberingRule Rule { get; set; } = new();
+
+    [Parameter]
+    public bool IsNew { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        if (IsNew)
+        {
+            await NumberingRuleService.CreateAsync(Rule);
+        }
+        else
+        {
+            await NumberingRuleService.UpdateAsync(Rule);
+        }
+
+        MudDialog.Close(DialogResult.Ok(Rule));
+    }
+
+    private string GetPreview()
+    {
+        var dateFormat = string.IsNullOrEmpty(Rule.DateFormat) ? "" : DateTime.Now.ToString(Rule.DateFormat);
+        var sequence = "1".PadLeft(Rule.SequenceLength, '0');
+        return $"{Rule.Prefix}{dateFormat}{sequence}";
+    }
+}

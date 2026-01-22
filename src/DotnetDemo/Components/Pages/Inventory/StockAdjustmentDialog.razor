@@ -1,0 +1,141 @@
+@using Microsoft.AspNetCore.Identity
+@using DotnetDemo.Services.Interfaces
+@inject IStockAdjustmentService StockAdjustmentService
+@inject IWarehouseService WarehouseService
+@inject IProductService ProductService
+@inject IInventoryService InventoryService
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="int" @bind-Value="_warehouseId" Label="倉庫" Required="true"
+                           RequiredError="請選擇倉庫">
+                    @foreach (var warehouse in _warehouses)
+                    {
+                        <MudSelectItem Value="@warehouse.Id">@warehouse.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_reason" Label="調整原因" Required="true" RequiredError="請輸入調整原因" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_notes" Label="備註" Lines="2" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudDivider Class="my-2" />
+                <MudText Typo="Typo.subtitle1" Class="mb-2">調整項目</MudText>
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AddItem">新增項目</MudButton>
+            </MudItem>
+            @for (int i = 0; i < _items.Count; i++)
+            {
+                var index = i;
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="int" @bind-Value="_items[index].ProductId" Label="商品"
+                               Required="true" RequiredError="請選擇商品">
+                        @foreach (var product in _products)
+                        {
+                            <MudSelectItem Value="@product.Id">@product.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudNumericField T="int" @bind-Value="_items[index].AfterQuantity" Label="調整後數量" Min="0" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudText>調整前: @(_items[index].BeforeQuantity)</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="2">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                   OnClick="@(() => RemoveItem(index))" />
+                </MudItem>
+            }
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync"
+                   Disabled="@(!_items.Any() || _warehouseId == 0)">儲存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private MudDialogInstance MudDialog { get; set; } = null!;
+
+    private List<Warehouse> _warehouses = new();
+    private List<Product> _products = new();
+    private int _warehouseId;
+    private string _reason = string.Empty;
+    private string? _notes;
+    private List<AdjustmentItem> _items = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _warehouses = await WarehouseService.GetActiveAsync();
+        _products = await ProductService.SearchAsync(null, null, true);
+        if (_warehouses.Any())
+        {
+            _warehouseId = _warehouses.First().Id;
+        }
+    }
+
+    private void AddItem()
+    {
+        _items.Add(new AdjustmentItem());
+    }
+
+    private void RemoveItem(int index)
+    {
+        _items.RemoveAt(index);
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_warehouseId == 0 || !_items.Any() || string.IsNullOrEmpty(_reason))
+        {
+            Snackbar.Add("請填寫完整資料", Severity.Warning);
+            return;
+        }
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(authState.User);
+        var userId = user?.Id ?? 0;
+
+        var adjustment = new StockAdjustment
+        {
+            WarehouseId = _warehouseId,
+            Reason = _reason,
+            Notes = _notes,
+            Items = _items.Select(i => new StockAdjustmentItem
+            {
+                ProductId = i.ProductId,
+                AfterQuantity = i.AfterQuantity,
+                BeforeQuantity = i.BeforeQuantity
+            }).ToList()
+        };
+
+        try
+        {
+            await StockAdjustmentService.CreateAsync(adjustment, userId);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"儲存失敗：{ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private class AdjustmentItem
+    {
+        public int ProductId { get; set; }
+        public int BeforeQuantity { get; set; }
+        public int AfterQuantity { get; set; }
+    }
+}

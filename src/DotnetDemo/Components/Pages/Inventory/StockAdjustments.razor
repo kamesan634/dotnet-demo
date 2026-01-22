@@ -1,8 +1,8 @@
 @page "/stock-adjustments"
 @attribute [Authorize]
-@using Microsoft.EntityFrameworkCore
-@using DotnetDemo.Data
-@inject ApplicationDbContext DbContext
+@using DotnetDemo.Services.Interfaces
+@inject IStockAdjustmentService StockAdjustmentService
+@inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
 <PageTitle>庫存調整 - 零售管理系統</PageTitle>
@@ -15,7 +15,8 @@
             <MudText Typo="Typo.h6">調整單列表</MudText>
         </CardHeaderContent>
         <CardHeaderActions>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAddDialog">
                 新增調整單
             </MudButton>
         </CardHeaderActions>
@@ -35,7 +36,8 @@
                 <MudTd>@context.Reason</MudTd>
                 <MudTd>@context.CreatedAt.ToString("yyyy-MM-dd HH:mm")</MudTd>
                 <MudTd>
-                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => ViewDetails(context))" />
                 </MudTd>
             </RowTemplate>
             <NoRecordsContent>
@@ -51,11 +53,39 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
         _loading = true;
-        _adjustments = await DbContext.StockAdjustments
-            .Include(a => a.Warehouse)
-            .OrderByDescending(a => a.CreatedAt)
-            .ToListAsync();
+        _adjustments = await StockAdjustmentService.SearchAsync(null, null, null, null);
         _loading = false;
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<StockAdjustmentDialog>("新增庫存調整單", null, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadDataAsync();
+            Snackbar.Add("庫存調整單已建立", Severity.Success);
+        }
+    }
+
+    private async Task ViewDetails(StockAdjustment adjustment)
+    {
+        var fullAdjustment = await StockAdjustmentService.GetByIdAsync(adjustment.Id);
+        if (fullAdjustment == null) return;
+
+        var message = $"調整單號：{fullAdjustment.AdjustmentNumber}\n" +
+                      $"倉庫：{fullAdjustment.Warehouse?.Name}\n" +
+                      $"原因：{fullAdjustment.Reason}\n" +
+                      $"項目數：{fullAdjustment.Items.Count}";
+
+        await DialogService.ShowMessageBox("調整單詳情", message, yesText: "關閉");
     }
 }

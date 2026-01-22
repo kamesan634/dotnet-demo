@@ -1,0 +1,65 @@
+@using DotnetDemo.Services.Interfaces
+@inject IRoleService RoleService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="Role.Name" Label="角色名稱" Required="true"
+                              RequiredError="請輸入角色名稱" Disabled="@Role.IsSystemRole" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="Role.Description" Label="說明" Lines="2" />
+            </MudItem>
+            @if (Role.IsSystemRole)
+            {
+                <MudItem xs="12">
+                    <MudAlert Severity="Severity.Info">系統角色無法修改名稱</MudAlert>
+                </MudItem>
+            }
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">儲存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public ApplicationRole Role { get; set; } = new();
+    [Parameter] public bool IsNew { get; set; }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrEmpty(Role.Name))
+        {
+            Snackbar.Add("請輸入角色名稱", Severity.Warning);
+            return;
+        }
+
+        if (IsNew)
+        {
+            var (success, error) = await RoleService.CreateAsync(Role);
+            if (!success)
+            {
+                Snackbar.Add($"建立失敗：{error}", Severity.Error);
+                return;
+            }
+        }
+        else
+        {
+            var (success, error) = await RoleService.UpdateAsync(Role);
+            if (!success)
+            {
+                Snackbar.Add($"更新失敗：{error}", Severity.Error);
+                return;
+            }
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

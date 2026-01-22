@@ -1,0 +1,103 @@
+@using Microsoft.AspNetCore.Identity
+@using DotnetDemo.Services.Interfaces
+@inject IStockCountService StockCountService
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">編輯盤點 - @StockCount.CountNumber</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTable Items="@StockCount.Items" Dense="true" Hover="true" FixedHeader="true" Height="400px">
+            <HeaderContent>
+                <MudTh>商品代碼</MudTh>
+                <MudTh>商品名稱</MudTh>
+                <MudTh>系統數量</MudTh>
+                <MudTh>實際數量</MudTh>
+                <MudTh>差異</MudTh>
+                <MudTh>狀態</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Product?.Code</MudTd>
+                <MudTd>@context.Product?.Name</MudTd>
+                <MudTd>@context.SystemQuantity</MudTd>
+                <MudTd>
+                    <MudNumericField T="int?" Value="@context.ActualQuantity"
+                                     Variant="Variant.Outlined" Margin="Margin.Dense"
+                                     Style="width: 100px;"
+                                     ValueChanged="@((int? v) => UpdateItem(context, v))" />
+                </MudTd>
+                <MudTd>
+                    @if (context.Difference.HasValue)
+                    {
+                        <MudText Color="@(context.Difference > 0 ? Color.Success : context.Difference < 0 ? Color.Error : Color.Default)">
+                            @(context.Difference > 0 ? "+" : "")@context.Difference
+                        </MudText>
+                    }
+                </MudTd>
+                <MudTd>
+                    @if (context.IsCounted)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" />
+                    }
+                    else
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.RadioButtonUnchecked" Size="Size.Small" Color="Color.Default" />
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+
+        <MudGrid Class="mt-3">
+            <MudItem xs="4">
+                <MudText>總項數：@StockCount.Items.Count</MudText>
+            </MudItem>
+            <MudItem xs="4">
+                <MudText>已盤點：@StockCount.Items.Count(i => i.IsCounted)</MudText>
+            </MudItem>
+            <MudItem xs="4">
+                <MudText>未盤點：@StockCount.Items.Count(i => !i.IsCounted)</MudText>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">關閉</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAll">
+            儲存變更
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public StockCount StockCount { get; set; } = new();
+
+    private Dictionary<int, int?> _changes = new();
+
+    private void UpdateItem(StockCountItem item, int? actualQuantity)
+    {
+        item.ActualQuantity = actualQuantity;
+        item.Difference = actualQuantity.HasValue ? actualQuantity.Value - item.SystemQuantity : null;
+        _changes[item.Id] = actualQuantity;
+    }
+
+    private void Cancel() => MudDialog.Close(DialogResult.Cancel());
+
+    private async Task SaveAll()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(authState.User);
+        var userId = user?.Id ?? 0;
+
+        foreach (var change in _changes.Where(c => c.Value.HasValue))
+        {
+            await StockCountService.UpdateItemQuantityAsync(change.Key, change.Value!.Value, userId);
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+}

@@ -88,6 +88,54 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     /// <summary>操作紀錄</summary>
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
+    /// <summary>系統參數</summary>
+    public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
+
+    /// <summary>編號規則</summary>
+    public DbSet<NumberingRule> NumberingRules => Set<NumberingRule>();
+
+    /// <summary>稅別設定</summary>
+    public DbSet<TaxSetting> TaxSettings => Set<TaxSetting>();
+
+    /// <summary>收銀班別</summary>
+    public DbSet<CashierShift> CashierShifts => Set<CashierShift>();
+
+    /// <summary>發票</summary>
+    public DbSet<Invoice> Invoices => Set<Invoice>();
+
+    /// <summary>促銷活動</summary>
+    public DbSet<Promotion> Promotions => Set<Promotion>();
+
+    /// <summary>促銷商品</summary>
+    public DbSet<PromotionItem> PromotionItems => Set<PromotionItem>();
+
+    /// <summary>掛單</summary>
+    public DbSet<HeldOrder> HeldOrders => Set<HeldOrder>();
+
+    /// <summary>商品規格</summary>
+    public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
+
+    /// <summary>商品組合</summary>
+    public DbSet<ProductBundle> ProductBundles => Set<ProductBundle>();
+
+    /// <summary>商品組合明細</summary>
+    public DbSet<ProductBundleItem> ProductBundleItems => Set<ProductBundleItem>();
+
+    /// <summary>採購退貨</summary>
+    public DbSet<PurchaseReturn> PurchaseReturns => Set<PurchaseReturn>();
+
+    /// <summary>採購退貨明細</summary>
+    public DbSet<PurchaseReturnItem> PurchaseReturnItems => Set<PurchaseReturnItem>();
+
+    /// <summary>庫存盤點</summary>
+    public DbSet<StockCount> StockCounts => Set<StockCount>();
+
+    /// <summary>盤點明細</summary>
+    public DbSet<StockCountItem> StockCountItems => Set<StockCountItem>();
+
+    /// <summary>報表排程</summary>
+    public DbSet<ReportSchedule> ReportSchedules => Set<ReportSchedule>();
+
     /// <summary>
     /// 配置模型
     /// </summary>
@@ -242,6 +290,102 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         {
             e.HasIndex(x => x.CreatedAt);
             e.HasIndex(x => new { x.EntityType, x.EntityId });
+        });
+
+        // SystemSetting
+        builder.Entity<SystemSetting>(e =>
+        {
+            e.HasIndex(x => x.Key).IsUnique();
+        });
+
+        // NumberingRule
+        builder.Entity<NumberingRule>(e =>
+        {
+            e.HasIndex(x => x.DocumentType).IsUnique();
+        });
+
+        // TaxSetting
+        builder.Entity<TaxSetting>(e =>
+        {
+            e.HasIndex(x => x.Code).IsUnique();
+            e.Property(x => x.Rate).HasPrecision(5, 4);
+        });
+
+        // CashierShift
+        builder.Entity<CashierShift>(e =>
+        {
+            e.Property(x => x.OpeningAmount).HasPrecision(18, 2);
+            e.Property(x => x.ClosingAmount).HasPrecision(18, 2);
+            e.Property(x => x.CashSalesTotal).HasPrecision(18, 2);
+            e.Property(x => x.NonCashSalesTotal).HasPrecision(18, 2);
+            e.Property(x => x.Difference).HasPrecision(18, 2);
+        });
+
+        // Invoice
+        builder.Entity<Invoice>(e =>
+        {
+            e.HasIndex(x => x.InvoiceNumber).IsUnique();
+            e.Property(x => x.SalesAmount).HasPrecision(18, 2);
+            e.Property(x => x.TaxAmount).HasPrecision(18, 2);
+            e.Property(x => x.TotalAmount).HasPrecision(18, 2);
+        });
+
+        // Promotion
+        builder.Entity<Promotion>(e =>
+        {
+            e.HasIndex(x => x.Code).IsUnique();
+            e.Property(x => x.DiscountValue).HasPrecision(18, 2);
+            e.Property(x => x.MinimumAmount).HasPrecision(18, 2);
+        });
+
+        // HeldOrder
+        builder.Entity<HeldOrder>(e =>
+        {
+            e.HasIndex(x => x.HoldNumber).IsUnique();
+            e.Property(x => x.TotalAmount).HasPrecision(18, 2);
+        });
+
+        // ProductVariant
+        builder.Entity<ProductVariant>(e =>
+        {
+            e.HasIndex(x => x.Sku);
+            e.HasIndex(x => x.Barcode);
+            e.Property(x => x.CostPriceAdjustment).HasPrecision(18, 2);
+            e.Property(x => x.SellingPriceAdjustment).HasPrecision(18, 2);
+        });
+
+        // ProductBundle
+        builder.Entity<ProductBundle>(e =>
+        {
+            e.HasIndex(x => x.Code).IsUnique();
+            e.Property(x => x.SellingPrice).HasPrecision(18, 2);
+            e.Property(x => x.OriginalTotal).HasPrecision(18, 2);
+        });
+
+        // PurchaseReturn
+        builder.Entity<PurchaseReturn>(e =>
+        {
+            e.HasIndex(x => x.ReturnNumber).IsUnique();
+            e.Property(x => x.TotalAmount).HasPrecision(18, 2);
+        });
+
+        // PurchaseReturnItem
+        builder.Entity<PurchaseReturnItem>(e =>
+        {
+            e.Property(x => x.UnitPrice).HasPrecision(18, 2);
+            e.Property(x => x.SubTotal).HasPrecision(18, 2);
+        });
+
+        // StockCount
+        builder.Entity<StockCount>(e =>
+        {
+            e.HasIndex(x => x.CountNumber).IsUnique();
+        });
+
+        // ReportSchedule
+        builder.Entity<ReportSchedule>(e =>
+        {
+            e.HasIndex(x => x.ReportType);
         });
     }
 }

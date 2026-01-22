@@ -1,8 +1,11 @@
 @page "/stock-transfers"
 @attribute [Authorize]
-@using Microsoft.EntityFrameworkCore
-@using DotnetDemo.Data
-@inject ApplicationDbContext DbContext
+@using Microsoft.AspNetCore.Identity
+@using DotnetDemo.Services.Interfaces
+@inject IStockTransferService StockTransferService
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
 <PageTitle>庫存調撥 - 零售管理系統</PageTitle>
@@ -15,7 +18,8 @@
             <MudText Typo="Typo.h6">調撥單列表</MudText>
         </CardHeaderContent>
         <CardHeaderActions>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAddDialog">
                 新增調撥單
             </MudButton>
         </CardHeaderActions>
@@ -41,7 +45,20 @@
                 </MudTd>
                 <MudTd>@context.CreatedAt.ToString("yyyy-MM-dd HH:mm")</MudTd>
                 <MudTd>
-                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => ViewDetails(context))" />
+                    @if (context.Status == StockTransferStatus.Pending)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.LocalShipping" Size="Size.Small" Color="Color.Info"
+                                       OnClick="@(() => Ship(context))" Title="出庫" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" Color="Color.Error"
+                                       OnClick="@(() => Cancel(context))" Title="取消" />
+                    }
+                    @if (context.Status == StockTransferStatus.Shipped)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Inventory" Size="Size.Small" Color="Color.Success"
+                                       OnClick="@(() => Receive(context))" Title="入庫" />
+                    }
                 </MudTd>
             </RowTemplate>
             <NoRecordsContent>
@@ -57,13 +74,114 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
         _loading = true;
-        _transfers = await DbContext.StockTransfers
-            .Include(t => t.FromWarehouse)
-            .Include(t => t.ToWarehouse)
-            .OrderByDescending(t => t.CreatedAt)
-            .ToListAsync();
+        _transfers = await StockTransferService.SearchAsync(null, null, null, null, null, null);
         _loading = false;
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<StockTransferDialog>("新增調撥單", null, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadDataAsync();
+            Snackbar.Add("調撥單已建立", Severity.Success);
+        }
+    }
+
+    private async Task<int> GetCurrentUserId()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(authState.User);
+        return user?.Id ?? 0;
+    }
+
+    private async Task Ship(StockTransfer transfer)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "確認出庫", $"確定要將調撥單「{transfer.TransferNumber}」出庫嗎？",
+            yesText: "確認", cancelText: "取消");
+
+        if (result == true)
+        {
+            var userId = await GetCurrentUserId();
+            var success = await StockTransferService.ShipAsync(transfer.Id, userId);
+            if (success)
+            {
+                await LoadDataAsync();
+                Snackbar.Add("已出庫", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("出庫失敗，請確認庫存是否足夠", Severity.Error);
+            }
+        }
+    }
+
+    private async Task Receive(StockTransfer transfer)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "確認入庫", $"確定要將調撥單「{transfer.TransferNumber}」入庫嗎？",
+            yesText: "確認", cancelText: "取消");
+
+        if (result == true)
+        {
+            var userId = await GetCurrentUserId();
+            var success = await StockTransferService.ReceiveAsync(transfer.Id, userId);
+            if (success)
+            {
+                await LoadDataAsync();
+                Snackbar.Add("已入庫", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("入庫失敗", Severity.Error);
+            }
+        }
+    }
+
+    private async Task Cancel(StockTransfer transfer)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "確認取消", $"確定要取消調撥單「{transfer.TransferNumber}」嗎？",
+            yesText: "確認", cancelText: "取消");
+
+        if (result == true)
+        {
+            var userId = await GetCurrentUserId();
+            var success = await StockTransferService.CancelAsync(transfer.Id, userId);
+            if (success)
+            {
+                await LoadDataAsync();
+                Snackbar.Add("已取消", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("取消失敗", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ViewDetails(StockTransfer transfer)
+    {
+        var fullTransfer = await StockTransferService.GetByIdAsync(transfer.Id);
+        if (fullTransfer == null) return;
+
+        var message = $"調撥單號：{fullTransfer.TransferNumber}\n" +
+                      $"調出倉庫：{fullTransfer.FromWarehouse?.Name}\n" +
+                      $"調入倉庫：{fullTransfer.ToWarehouse?.Name}\n" +
+                      $"狀態：{GetStatusText(fullTransfer.Status)}\n" +
+                      $"項目數：{fullTransfer.Items.Count}";
+
+        await DialogService.ShowMessageBox("調撥單詳情", message, yesText: "關閉");
     }
 
     private Color GetStatusColor(StockTransferStatus status) => status switch

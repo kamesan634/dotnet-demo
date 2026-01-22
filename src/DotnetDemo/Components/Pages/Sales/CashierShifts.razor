@@ -1,0 +1,135 @@
+@page "/cashier-shifts"
+@attribute [Authorize(Roles = "Admin,Manager")]
+@using DotnetDemo.Services.Interfaces
+@inject ICashierShiftService CashierShiftService
+@inject IStoreService StoreService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>收銀班別 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">收銀班別</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudGrid>
+                <MudItem xs="12" sm="3">
+                    <MudSelect T="int?" @bind-Value="_filterStoreId" Label="門市" Variant="Variant.Outlined" Clearable="true">
+                        @foreach (var store in _stores)
+                        {
+                            <MudSelectItem T="int?" Value="@store.Id">@store.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudSelect T="CashierShiftStatus?" @bind-Value="_filterStatus" Label="狀態" Variant="Variant.Outlined" Clearable="true">
+                        <MudSelectItem T="CashierShiftStatus?" Value="CashierShiftStatus.Open">進行中</MudSelectItem>
+                        <MudSelectItem T="CashierShiftStatus?" Value="CashierShiftStatus.Closed">已結班</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudDateRangePicker @bind-DateRange="_dateRange" Label="日期範圍" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SearchAsync"
+                               StartIcon="@Icons.Material.Filled.Search" Class="mt-1">搜尋</MudButton>
+                </MudItem>
+            </MudGrid>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_shifts" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>門市</MudTh>
+                <MudTh>收銀員</MudTh>
+                <MudTh>開班時間</MudTh>
+                <MudTh>結班時間</MudTh>
+                <MudTh>開班金額</MudTh>
+                <MudTh>現金銷售</MudTh>
+                <MudTh>非現金銷售</MudTh>
+                <MudTh>交易筆數</MudTh>
+                <MudTh>狀態</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Store?.Name</MudTd>
+                <MudTd>@context.Cashier?.DisplayName</MudTd>
+                <MudTd>@context.OpenedAt.ToString("MM/dd HH:mm")</MudTd>
+                <MudTd>@context.ClosedAt?.ToString("MM/dd HH:mm")</MudTd>
+                <MudTd>@context.OpeningAmount.ToString("C0")</MudTd>
+                <MudTd>@context.CashSalesTotal.ToString("C0")</MudTd>
+                <MudTd>@context.NonCashSalesTotal.ToString("C0")</MudTd>
+                <MudTd>@context.TransactionCount</MudTd>
+                <MudTd>
+                    <MudChip Size="Size.Small" Color="@(context.Status == CashierShiftStatus.Open ? Color.Success : Color.Default)">
+                        @(context.Status == CashierShiftStatus.Open ? "進行中" : "已結班")
+                    </MudChip>
+                </MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => ViewDetails(context))" Title="查看詳情" />
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText>尚無班別資料</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<CashierShift> _shifts = new();
+    private List<Store> _stores = new();
+    private bool _loading = true;
+    private int? _filterStoreId;
+    private CashierShiftStatus? _filterStatus;
+    private DateRange _dateRange = new(DateTime.Today.AddDays(-7), DateTime.Today);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _stores = await StoreService.GetAllAsync();
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        _loading = true;
+        _shifts = await CashierShiftService.SearchAsync(
+            _filterStoreId,
+            null,
+            _filterStatus,
+            _dateRange.Start,
+            _dateRange.End?.AddDays(1));
+        _loading = false;
+    }
+
+    private async Task ViewDetails(CashierShift shift)
+    {
+        var summary = await CashierShiftService.GetShiftSummaryAsync(shift.Id);
+
+        var message = $"收銀員：{shift.Cashier?.DisplayName}\n" +
+                      $"開班時間：{shift.OpenedAt:yyyy-MM-dd HH:mm}\n" +
+                      $"結班時間：{shift.ClosedAt?.ToString("yyyy-MM-dd HH:mm") ?? "進行中"}\n\n" +
+                      $"開班金額：{shift.OpeningAmount:C0}\n" +
+                      $"結班金額：{shift.ClosingAmount?.ToString("C0") ?? "-"}\n\n" +
+                      $"交易筆數：{summary.TransactionCount}\n" +
+                      $"現金銷售：{summary.CashSales:C0}\n" +
+                      $"非現金銷售：{summary.NonCashSales:C0}\n" +
+                      $"銷售總額：{summary.TotalSales:C0}\n" +
+                      $"退貨金額：{summary.RefundAmount:C0}\n" +
+                      $"淨銷售額：{summary.NetSales:C0}\n";
+
+        if (shift.Difference.HasValue)
+        {
+            message += $"\n差額：{shift.Difference:C0}";
+        }
+
+        if (!string.IsNullOrEmpty(shift.Notes))
+        {
+            message += $"\n備註：{shift.Notes}";
+        }
+
+        await DialogService.ShowMessageBox("班別詳情", message, yesText: "關閉");
+    }
+}

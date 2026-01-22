@@ -1,0 +1,174 @@
+@using Microsoft.AspNetCore.Identity
+@using DotnetDemo.Services.Interfaces
+@inject IPurchaseReturnService PurchaseReturnService
+@inject ISupplierService SupplierService
+@inject IWarehouseService WarehouseService
+@inject IProductService ProductService
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">新增退貨單</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int" @bind-Value="_supplierId" Label="供應商" Required="true"
+                               RequiredError="請選擇供應商" Variant="Variant.Outlined">
+                        @foreach (var supplier in _suppliers)
+                        {
+                            <MudSelectItem Value="@supplier.Id">@supplier.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int" @bind-Value="_warehouseId" Label="倉庫" Required="true"
+                               RequiredError="請選擇倉庫" Variant="Variant.Outlined">
+                        @foreach (var wh in _warehouses)
+                        {
+                            <MudSelectItem Value="@wh.Id">@wh.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_reason" Label="退貨原因" Required="true"
+                                  RequiredError="請輸入退貨原因" Variant="Variant.Outlined" />
+                </MudItem>
+            </MudGrid>
+
+            <MudText Typo="Typo.subtitle1" Class="mt-4 mb-2">退貨商品</MudText>
+            <MudTable Items="@_items" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>商品</MudTh>
+                    <MudTh>數量</MudTh>
+                    <MudTh>單價</MudTh>
+                    <MudTh>小計</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Product?.Name</MudTd>
+                    <MudTd>@context.Quantity</MudTd>
+                    <MudTd>@context.UnitPrice.ToString("C0")</MudTd>
+                    <MudTd>@context.SubTotal.ToString("C0")</MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                       OnClick="@(() => RemoveItem(context))" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+
+            <MudGrid Class="mt-3">
+                <MudItem xs="12" sm="5">
+                    <MudAutocomplete T="Product" @bind-Value="_selectedProduct" Label="選擇商品"
+                                     SearchFunc="SearchProducts" ToStringFunc="@(p => p?.Name ?? "")"
+                                     Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="2">
+                    <MudNumericField @bind-Value="_itemQuantity" Label="數量" Min="1" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudNumericField @bind-Value="_itemPrice" Label="單價" Min="0" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddItem" Class="mt-1">
+                        加入
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+
+            <MudText Typo="Typo.h6" Class="mt-3 text-right">
+                總金額：@_items.Sum(i => i.SubTotal).ToString("C0")
+            </MudText>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit"
+                   Disabled="@(!_isValid || !_items.Any())">
+            建立退貨單
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; } = null!;
+
+    private MudForm _form = null!;
+    private bool _isValid;
+
+    private List<Supplier> _suppliers = new();
+    private List<Warehouse> _warehouses = new();
+    private List<PurchaseReturnItem> _items = new();
+
+    private int _supplierId;
+    private int _warehouseId;
+    private string _reason = string.Empty;
+
+    private Product? _selectedProduct;
+    private int _itemQuantity = 1;
+    private decimal _itemPrice;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _suppliers = await SupplierService.GetAllAsync();
+        _warehouses = await WarehouseService.GetAllAsync();
+    }
+
+    private async Task<IEnumerable<Product>> SearchProducts(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return Enumerable.Empty<Product>();
+
+        var products = await ProductService.SearchAsync(value, null, true);
+        return products.Take(10);
+    }
+
+    private void AddItem()
+    {
+        if (_selectedProduct == null || _itemQuantity <= 0) return;
+
+        var item = new PurchaseReturnItem
+        {
+            ProductId = _selectedProduct.Id,
+            Product = _selectedProduct,
+            Quantity = _itemQuantity,
+            UnitPrice = _itemPrice > 0 ? _itemPrice : _selectedProduct.CostPrice,
+            SubTotal = _itemQuantity * (_itemPrice > 0 ? _itemPrice : _selectedProduct.CostPrice)
+        };
+
+        _items.Add(item);
+        _selectedProduct = null;
+        _itemQuantity = 1;
+        _itemPrice = 0;
+    }
+
+    private void RemoveItem(PurchaseReturnItem item)
+    {
+        _items.Remove(item);
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid || !_items.Any()) return;
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(authState.User);
+
+        var purchaseReturn = new PurchaseReturn
+        {
+            SupplierId = _supplierId,
+            WarehouseId = _warehouseId,
+            Reason = _reason,
+            Items = _items
+        };
+
+        await PurchaseReturnService.CreateAsync(purchaseReturn, user?.Id ?? 0);
+        MudDialog.Close(DialogResult.Ok(purchaseReturn));
+    }
+}

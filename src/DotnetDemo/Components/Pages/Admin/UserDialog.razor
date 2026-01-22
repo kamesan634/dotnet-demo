@@ -1,0 +1,120 @@
+@using DotnetDemo.Services.Interfaces
+@inject IUserService UserService
+@inject IStoreService StoreService
+@inject IRoleService RoleService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="User.UserName" Label="帳號" Required="true"
+                              RequiredError="請輸入帳號" Disabled="@(!IsNew)" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="User.DisplayName" Label="顯示名稱" Required="true"
+                              RequiredError="請輸入顯示名稱" />
+            </MudItem>
+            @if (IsNew)
+            {
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_password" Label="密碼" InputType="InputType.Password"
+                                  Required="true" RequiredError="請輸入密碼" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_confirmPassword" Label="確認密碼" InputType="InputType.Password"
+                                  Required="true" RequiredError="請確認密碼" />
+                </MudItem>
+            }
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="User.Email" Label="Email" InputType="InputType.Email" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="User.PhoneNumber" Label="電話" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="int?" @bind-Value="User.StoreId" Label="所屬門市" Clearable="true">
+                    @foreach (var store in _stores)
+                    {
+                        <MudSelectItem Value="@((int?)store.Id)">@store.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" @bind-SelectedValues="_selectedRoles" Label="角色" MultiSelection="true">
+                    @foreach (var role in _roles)
+                    {
+                        <MudSelectItem Value="@role.Name">@role.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12">
+                <MudSwitch T="bool" @bind-Value="User.IsActive" Label="啟用" Color="Color.Primary" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">儲存</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public ApplicationUser User { get; set; } = new();
+    [Parameter] public bool IsNew { get; set; }
+
+    private List<Store> _stores = new();
+    private List<ApplicationRole> _roles = new();
+    private IEnumerable<string> _selectedRoles = new List<string>();
+    private string _password = string.Empty;
+    private string _confirmPassword = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _stores = await StoreService.GetActiveAsync();
+        _roles = await RoleService.GetAllAsync();
+
+        if (!IsNew)
+        {
+            _selectedRoles = await UserService.GetRolesAsync(User.Id);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (IsNew)
+        {
+            if (string.IsNullOrEmpty(_password))
+            {
+                Snackbar.Add("請輸入密碼", Severity.Warning);
+                return;
+            }
+            if (_password != _confirmPassword)
+            {
+                Snackbar.Add("密碼與確認密碼不符", Severity.Warning);
+                return;
+            }
+
+            var (success, error) = await UserService.CreateAsync(User, _password, _selectedRoles);
+            if (!success)
+            {
+                Snackbar.Add($"建立失敗：{error}", Severity.Error);
+                return;
+            }
+        }
+        else
+        {
+            var (success, error) = await UserService.UpdateAsync(User, _selectedRoles);
+            if (!success)
+            {
+                Snackbar.Add($"更新失敗：{error}", Severity.Error);
+                return;
+            }
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

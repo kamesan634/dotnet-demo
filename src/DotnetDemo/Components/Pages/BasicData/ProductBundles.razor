@@ -1,0 +1,193 @@
+@page "/product-bundles"
+@attribute [Authorize(Roles = "Admin,Manager")]
+@using DotnetDemo.Services.Interfaces
+@inject IProductBundleService ProductBundleService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>商品組合 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">商品組合</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudGrid>
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_searchKeyword" Label="關鍵字搜尋" Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                                  Immediate="true" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudSelect T="bool?" @bind-Value="_filterActive" Label="狀態" Variant="Variant.Outlined" Clearable="true">
+                        <MudSelectItem T="bool?" Value="true">啟用</MudSelectItem>
+                        <MudSelectItem T="bool?" Value="false">停用</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SearchAsync"
+                               StartIcon="@Icons.Material.Filled.Search" Class="mt-1">搜尋</MudButton>
+                </MudItem>
+            </MudGrid>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAddDialog">
+                新增組合
+            </MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_bundles" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>代碼</MudTh>
+                <MudTh>名稱</MudTh>
+                <MudTh>原價</MudTh>
+                <MudTh>組合價</MudTh>
+                <MudTh>折扣</MudTh>
+                <MudTh>商品數</MudTh>
+                <MudTh>銷售期間</MudTh>
+                <MudTh>狀態</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Code</MudTd>
+                <MudTd>@context.Name</MudTd>
+                <MudTd>@context.OriginalTotal.ToString("C0")</MudTd>
+                <MudTd>@context.SellingPrice.ToString("C0")</MudTd>
+                <MudTd>
+                    <MudChip Size="Size.Small" Color="Color.Success">
+                        省 @((context.OriginalTotal - context.SellingPrice).ToString("C0"))
+                    </MudChip>
+                </MudTd>
+                <MudTd>@context.Items.Count 項</MudTd>
+                <MudTd>
+                    @if (context.StartDate.HasValue && context.EndDate.HasValue)
+                    {
+                        @($"{context.StartDate:MM/dd} ~ {context.EndDate:MM/dd}")
+                    }
+                    else
+                    {
+                        <span>無限制</span>
+                    }
+                </MudTd>
+                <MudTd>
+                    <MudChip Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Default)">
+                        @(context.IsActive ? "啟用" : "停用")
+                    </MudChip>
+                </MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => ViewDetails(context))" Title="查看詳情" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => OpenEditDialog(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="@(() => Delete(context))" />
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText>尚無商品組合</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<ProductBundle> _bundles = new();
+    private bool _loading = true;
+    private string? _searchKeyword;
+    private bool? _filterActive;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        _loading = true;
+        _bundles = await ProductBundleService.SearchAsync(_searchKeyword, _filterActive);
+        _loading = false;
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "Bundle", new ProductBundle { IsActive = true } },
+            { "IsNew", true }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ProductBundleDialog>("新增商品組合", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await SearchAsync();
+            Snackbar.Add("商品組合已新增", Severity.Success);
+        }
+    }
+
+    private async Task OpenEditDialog(ProductBundle bundle)
+    {
+        var fullBundle = await ProductBundleService.GetByIdAsync(bundle.Id);
+        if (fullBundle == null) return;
+
+        var parameters = new DialogParameters
+        {
+            { "Bundle", fullBundle },
+            { "IsNew", false }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ProductBundleDialog>("編輯商品組合", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await SearchAsync();
+            Snackbar.Add("商品組合已更新", Severity.Success);
+        }
+    }
+
+    private async Task ViewDetails(ProductBundle bundle)
+    {
+        var fullBundle = await ProductBundleService.GetByIdAsync(bundle.Id);
+        if (fullBundle == null) return;
+
+        var itemDetails = string.Join("\n", fullBundle.Items.Select(i =>
+            $"  - {i.Product?.Name} x {i.Quantity}"));
+
+        var message = $"組合代碼：{fullBundle.Code}\n" +
+                      $"組合名稱：{fullBundle.Name}\n" +
+                      $"說明：{fullBundle.Description ?? "-"}\n\n" +
+                      $"組合商品：\n{itemDetails}\n\n" +
+                      $"原價總計：{fullBundle.OriginalTotal:C0}\n" +
+                      $"組合售價：{fullBundle.SellingPrice:C0}\n" +
+                      $"折扣金額：{(fullBundle.OriginalTotal - fullBundle.SellingPrice):C0}";
+
+        await DialogService.ShowMessageBox("商品組合詳情", message, yesText: "關閉");
+    }
+
+    private async Task Delete(ProductBundle bundle)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "確認刪除", $"確定要刪除商品組合「{bundle.Name}」嗎？",
+            yesText: "刪除", cancelText: "取消");
+
+        if (result == true)
+        {
+            var (success, error) = await ProductBundleService.DeleteAsync(bundle.Id);
+            if (success)
+            {
+                await SearchAsync();
+                Snackbar.Add("商品組合已刪除", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add($"刪除失敗：{error}", Severity.Error);
+            }
+        }
+    }
+}

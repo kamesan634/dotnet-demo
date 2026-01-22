@@ -1,0 +1,70 @@
+@using Microsoft.AspNetCore.Identity
+@using DotnetDemo.Services.Interfaces
+@inject IStockCountService StockCountService
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">新增盤點單</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudSelect T="int" @bind-Value="_warehouseId" Label="倉庫" Required="true"
+                       RequiredError="請選擇倉庫" Variant="Variant.Outlined" Class="mb-3">
+                @foreach (var wh in Warehouses)
+                {
+                    <MudSelectItem Value="@wh.Id">@wh.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudDatePicker @bind-Date="_countDate" Label="盤點日期" Variant="Variant.Outlined" Class="mb-3" />
+            <MudTextField @bind-Value="_scope" Label="盤點範圍說明" Lines="2"
+                          Variant="Variant.Outlined" Class="mb-3" />
+            <MudTextField @bind-Value="_notes" Label="備註" Lines="2"
+                          Variant="Variant.Outlined" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@(!_isValid)">
+            建立
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public List<Warehouse> Warehouses { get; set; } = new();
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private int _warehouseId;
+    private DateTime? _countDate = DateTime.Today;
+    private string? _scope;
+    private string? _notes;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(authState.User);
+
+        var stockCount = new StockCount
+        {
+            WarehouseId = _warehouseId,
+            CountDate = _countDate ?? DateTime.Today,
+            Scope = _scope,
+            Notes = _notes
+        };
+
+        await StockCountService.CreateAsync(stockCount, user?.Id ?? 0);
+        MudDialog.Close(DialogResult.Ok(stockCount));
+    }
+}

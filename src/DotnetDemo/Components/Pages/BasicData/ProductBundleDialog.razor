@@ -1,0 +1,189 @@
+@using DotnetDemo.Services.Interfaces
+@inject IProductBundleService ProductBundleService
+@inject IProductService ProductService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(IsNew ? "新增商品組合" : "編輯商品組合")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Bundle.Code" Label="代碼" Required="true"
+                                  RequiredError="請輸入代碼" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Bundle.Name" Label="名稱" Required="true"
+                                  RequiredError="請輸入名稱" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Bundle.Description" Label="說明" Lines="2"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker @bind-Date="_startDate" Label="開始銷售日期" Variant="Variant.Outlined"
+                                   Clearable="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker @bind-Date="_endDate" Label="結束銷售日期" Variant="Variant.Outlined"
+                                   Clearable="true" />
+                </MudItem>
+            </MudGrid>
+
+            <MudText Typo="Typo.subtitle1" Class="mt-4 mb-2">組合商品</MudText>
+            <MudTable Items="@_items" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>商品</MudTh>
+                    <MudTh>數量</MudTh>
+                    <MudTh>單價</MudTh>
+                    <MudTh>小計</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Product?.Name</MudTd>
+                    <MudTd>@context.Quantity</MudTd>
+                    <MudTd>@context.Product?.SellingPrice.ToString("C0")</MudTd>
+                    <MudTd>@((context.Product?.SellingPrice ?? 0) * context.Quantity).ToString("C0")</MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                       OnClick="@(() => RemoveItem(context))" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+
+            <MudGrid Class="mt-3">
+                <MudItem xs="12" sm="7">
+                    <MudAutocomplete T="Product" @bind-Value="_selectedProduct" Label="選擇商品"
+                                     SearchFunc="SearchProducts" ToStringFunc="@(p => p?.Name ?? "")"
+                                     Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudNumericField @bind-Value="_itemQuantity" Label="數量" Min="1" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddItem" Class="mt-1">
+                        加入
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+
+            <MudGrid Class="mt-3">
+                <MudItem xs="12" sm="6">
+                    <MudText>原價總計：<strong>@_originalTotal.ToString("C0")</strong></MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="Bundle.SellingPrice" Label="組合售價"
+                                     Variant="Variant.Outlined" />
+                </MudItem>
+            </MudGrid>
+
+            <MudCheckBox T="bool" @bind-Value="Bundle.IsActive" Label="啟用" Class="mt-3" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit"
+                   Disabled="@(!_isValid || !_items.Any())">
+            @(IsNew ? "新增" : "儲存")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public ProductBundle Bundle { get; set; } = new();
+
+    [Parameter]
+    public bool IsNew { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+
+    private List<ProductBundleItem> _items = new();
+    private Product? _selectedProduct;
+    private int _itemQuantity = 1;
+    private decimal _originalTotal;
+    private DateTime? _startDate;
+    private DateTime? _endDate;
+
+    protected override void OnInitialized()
+    {
+        _items = Bundle.Items.ToList();
+        _startDate = Bundle.StartDate;
+        _endDate = Bundle.EndDate;
+        CalculateTotal();
+    }
+
+    private async Task<IEnumerable<Product>> SearchProducts(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return Enumerable.Empty<Product>();
+
+        var products = await ProductService.SearchAsync(value, null, true);
+        return products.Take(10);
+    }
+
+    private void AddItem()
+    {
+        if (_selectedProduct == null || _itemQuantity <= 0) return;
+
+        var existing = _items.FirstOrDefault(i => i.ProductId == _selectedProduct.Id);
+        if (existing != null)
+        {
+            existing.Quantity += _itemQuantity;
+        }
+        else
+        {
+            _items.Add(new ProductBundleItem
+            {
+                ProductId = _selectedProduct.Id,
+                Product = _selectedProduct,
+                Quantity = _itemQuantity,
+                SortOrder = _items.Count
+            });
+        }
+
+        _selectedProduct = null;
+        _itemQuantity = 1;
+        CalculateTotal();
+    }
+
+    private void RemoveItem(ProductBundleItem item)
+    {
+        _items.Remove(item);
+        CalculateTotal();
+    }
+
+    private void CalculateTotal()
+    {
+        _originalTotal = _items.Sum(i => (i.Product?.SellingPrice ?? 0) * i.Quantity);
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid || !_items.Any()) return;
+
+        Bundle.Items = _items;
+        Bundle.OriginalTotal = _originalTotal;
+        Bundle.StartDate = _startDate;
+        Bundle.EndDate = _endDate;
+
+        if (IsNew)
+        {
+            await ProductBundleService.CreateAsync(Bundle);
+        }
+        else
+        {
+            await ProductBundleService.UpdateAsync(Bundle);
+        }
+
+        MudDialog.Close(DialogResult.Ok(Bundle));
+    }
+}

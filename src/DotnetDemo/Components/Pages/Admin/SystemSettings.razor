@@ -1,0 +1,106 @@
+@page "/system-settings"
+@attribute [Authorize(Roles = "Admin")]
+@using DotnetDemo.Services.Interfaces
+@inject ISystemSettingService SystemSettingService
+@inject ISnackbar Snackbar
+
+<PageTitle>系統參數 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">系統參數</MudText>
+
+<MudCard>
+    <MudCardContent>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            @foreach (var group in _settings.GroupBy(s => s.Group ?? "一般"))
+            {
+                <MudText Typo="Typo.h6" Class="mb-2 mt-4">@group.Key</MudText>
+                <MudDivider Class="mb-3" />
+
+                @foreach (var setting in group.OrderBy(s => s.SortOrder))
+                {
+                    <MudGrid Class="mb-3">
+                        <MudItem xs="12" sm="4">
+                            <MudText Typo="Typo.subtitle1">@setting.Description</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@setting.Key</MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            @if (setting.DataType == "Bool")
+                            {
+                                <MudSwitch T="bool" Value="@(bool.Parse(setting.Value ?? "false"))"
+                                           ValueChanged="@((bool v) => UpdateSetting(setting, v.ToString()))"
+                                           Disabled="@(!setting.IsEditable)" Color="Color.Primary" />
+                            }
+                            else if (setting.DataType == "Int")
+                            {
+                                <MudTextField T="string" Value="@setting.Value"
+                                              ValueChanged="@((string v) => UpdateSetting(setting, v))"
+                                              Variant="Variant.Outlined" Disabled="@(!setting.IsEditable)"
+                                              InputType="InputType.Number" />
+                            }
+                            else
+                            {
+                                <MudTextField T="string" Value="@setting.Value"
+                                              ValueChanged="@((string v) => UpdateSetting(setting, v))"
+                                              Variant="Variant.Outlined" Disabled="@(!setting.IsEditable)" />
+                            }
+                        </MudItem>
+                        <MudItem xs="12" sm="2">
+                            @if (!setting.IsEditable)
+                            {
+                                <MudChip Size="Size.Small" Color="Color.Default">唯讀</MudChip>
+                            }
+                        </MudItem>
+                    </MudGrid>
+                }
+            }
+        }
+    </MudCardContent>
+    <MudCardActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAll"
+                   StartIcon="@Icons.Material.Filled.Save">
+            儲存所有變更
+        </MudButton>
+    </MudCardActions>
+</MudCard>
+
+@code {
+    private List<SystemSetting> _settings = new();
+    private Dictionary<int, string> _changes = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        _settings = await SystemSettingService.GetAllAsync();
+        _changes.Clear();
+        _loading = false;
+    }
+
+    private void UpdateSetting(SystemSetting setting, string newValue)
+    {
+        setting.Value = newValue;
+        _changes[setting.Id] = newValue;
+    }
+
+    private async Task SaveAll()
+    {
+        foreach (var change in _changes)
+        {
+            var setting = _settings.First(s => s.Id == change.Key);
+            await SystemSettingService.SetValueAsync(setting.Key, change.Value);
+        }
+
+        _changes.Clear();
+        Snackbar.Add("系統參數已儲存", Severity.Success);
+    }
+}

@@ -127,4 +127,18 @@ public class ProductService : IProductService
         }
         return await query.AnyAsync();
     }
+
+    /// <inheritdoc />
+    public async Task<List<Product>> SearchForPosAsync(string searchText, int limit = 10)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+            return new List<Product>();
+
+        return await _context.Products
+            .Where(p => p.IsActive &&
+                (p.Name.Contains(searchText) ||
+                (p.Barcode != null && p.Barcode.Contains(searchText))))
+            .Take(limit)
+            .ToListAsync();
+    }
 }

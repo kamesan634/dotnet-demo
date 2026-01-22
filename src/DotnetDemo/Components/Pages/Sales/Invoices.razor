@@ -1,0 +1,205 @@
+@page "/invoices"
+@attribute [Authorize(Roles = "Admin,Manager")]
+@using DotnetDemo.Services.Interfaces
+@inject IInvoiceService InvoiceService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>發票管理 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">發票管理</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudGrid>
+                <MudItem xs="12" sm="3">
+                    <MudTextField @bind-Value="_searchKeyword" Label="發票號碼/買受人" Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
+                </MudItem>
+                <MudItem xs="12" sm="2">
+                    <MudSelect T="InvoiceType?" @bind-Value="_filterType" Label="發票類型" Variant="Variant.Outlined" Clearable="true">
+                        <MudSelectItem T="InvoiceType?" Value="InvoiceType.Duplicate">二聯式</MudSelectItem>
+                        <MudSelectItem T="InvoiceType?" Value="InvoiceType.Triplicate">三聯式</MudSelectItem>
+                        <MudSelectItem T="InvoiceType?" Value="InvoiceType.Electronic">電子發票</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="2">
+                    <MudSelect T="InvoiceStatus?" @bind-Value="_filterStatus" Label="狀態" Variant="Variant.Outlined" Clearable="true">
+                        <MudSelectItem T="InvoiceStatus?" Value="InvoiceStatus.Issued">已開立</MudSelectItem>
+                        <MudSelectItem T="InvoiceStatus?" Value="InvoiceStatus.Voided">已作廢</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudDateRangePicker @bind-DateRange="_dateRange" Label="日期範圍" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SearchAsync"
+                               StartIcon="@Icons.Material.Filled.Search" Class="mt-1">搜尋</MudButton>
+                </MudItem>
+            </MudGrid>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        @if (_stats != null)
+        {
+            <MudGrid Class="mb-4">
+                <MudItem xs="6" sm="3">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.caption">開立數量</MudText>
+                        <MudText Typo="Typo.h6">@_stats.IssuedCount 張</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.caption">開立金額</MudText>
+                        <MudText Typo="Typo.h6">@_stats.IssuedAmount.ToString("C0")</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.caption">作廢數量</MudText>
+                        <MudText Typo="Typo.h6">@_stats.VoidedCount 張</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.caption">作廢金額</MudText>
+                        <MudText Typo="Typo.h6">@_stats.VoidedAmount.ToString("C0")</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        }
+
+        <MudTable Items="@_invoices" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>發票號碼</MudTh>
+                <MudTh>訂單編號</MudTh>
+                <MudTh>類型</MudTh>
+                <MudTh>買受人</MudTh>
+                <MudTh>金額</MudTh>
+                <MudTh>開立日期</MudTh>
+                <MudTh>狀態</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.InvoiceNumber</MudTd>
+                <MudTd>@context.Order?.OrderNumber</MudTd>
+                <MudTd>@GetTypeName(context.Type)</MudTd>
+                <MudTd>@(context.BuyerName ?? "-")</MudTd>
+                <MudTd>@context.TotalAmount.ToString("C0")</MudTd>
+                <MudTd>@context.IssuedAt.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                <MudTd>
+                    <MudChip Size="Size.Small" Color="@GetStatusColor(context.Status)">
+                        @GetStatusName(context.Status)
+                    </MudChip>
+                </MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => ViewDetails(context))" Title="查看詳情" />
+                    @if (context.Status == InvoiceStatus.Issued)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" Color="Color.Error"
+                                       OnClick="@(() => VoidInvoice(context))" Title="作廢" />
+                    }
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText>尚無發票資料</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<Invoice> _invoices = new();
+    private InvoiceStats? _stats;
+    private bool _loading = true;
+    private string? _searchKeyword;
+    private InvoiceType? _filterType;
+    private InvoiceStatus? _filterStatus;
+    private DateRange _dateRange = new(DateTime.Today.AddDays(-30), DateTime.Today);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        _loading = true;
+        _invoices = await InvoiceService.SearchAsync(
+            _searchKeyword, _filterType, _filterStatus,
+            _dateRange.Start, _dateRange.End?.AddDays(1));
+        _stats = await InvoiceService.GetStatsAsync(
+            _dateRange.Start ?? DateTime.Today.AddDays(-30),
+            _dateRange.End?.AddDays(1) ?? DateTime.Today.AddDays(1));
+        _loading = false;
+    }
+
+    private async Task ViewDetails(Invoice invoice)
+    {
+        var message = $"發票號碼：{invoice.InvoiceNumber}\n" +
+                      $"隨機碼：{invoice.RandomNumber}\n" +
+                      $"類型：{GetTypeName(invoice.Type)}\n" +
+                      $"狀態：{GetStatusName(invoice.Status)}\n\n" +
+                      $"買受人：{invoice.BuyerName ?? "-"}\n" +
+                      $"統一編號：{invoice.BuyerTaxId ?? "-"}\n\n" +
+                      $"銷售額：{invoice.SalesAmount:C0}\n" +
+                      $"稅額：{invoice.TaxAmount:C0}\n" +
+                      $"總金額：{invoice.TotalAmount:C0}\n\n" +
+                      $"開立日期：{invoice.IssuedAt:yyyy-MM-dd HH:mm}";
+
+        if (invoice.Status == InvoiceStatus.Voided)
+        {
+            message += $"\n作廢日期：{invoice.VoidedAt:yyyy-MM-dd HH:mm}\n作廢原因：{invoice.VoidReason}";
+        }
+
+        await DialogService.ShowMessageBox("發票詳情", message, yesText: "關閉");
+    }
+
+    private async Task VoidInvoice(Invoice invoice)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "確認作廢", $"確定要作廢發票「{invoice.InvoiceNumber}」嗎？此操作無法復原。",
+            yesText: "作廢", cancelText: "取消");
+
+        if (result == true)
+        {
+            var (success, error) = await InvoiceService.VoidAsync(invoice.Id, "管理員手動作廢", 0);
+            if (success)
+            {
+                await SearchAsync();
+                Snackbar.Add("發票已作廢", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add($"作廢失敗：{error}", Severity.Error);
+            }
+        }
+    }
+
+    private string GetTypeName(InvoiceType type) => type switch
+    {
+        InvoiceType.Duplicate => "二聯式",
+        InvoiceType.Triplicate => "三聯式",
+        InvoiceType.Electronic => "電子發票",
+        _ => "未知"
+    };
+
+    private string GetStatusName(InvoiceStatus status) => status switch
+    {
+        InvoiceStatus.Issued => "已開立",
+        InvoiceStatus.Voided => "已作廢",
+        InvoiceStatus.Allowance => "已折讓",
+        _ => "未知"
+    };
+
+    private Color GetStatusColor(InvoiceStatus status) => status switch
+    {
+        InvoiceStatus.Issued => Color.Success,
+        InvoiceStatus.Voided => Color.Error,
+        InvoiceStatus.Allowance => Color.Warning,
+        _ => Color.Default
+    };
+}

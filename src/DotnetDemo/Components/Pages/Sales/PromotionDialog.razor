@@ -1,0 +1,135 @@
+@using DotnetDemo.Services.Interfaces
+@inject IPromotionService PromotionService
+@inject IStoreService StoreService
+@inject ICustomerLevelService CustomerLevelService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(IsNew ? "新增促銷活動" : "編輯促銷活動")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Promotion.Code" Label="代碼" Required="true"
+                                  RequiredError="請輸入代碼" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Promotion.Name" Label="名稱" Required="true"
+                                  RequiredError="請輸入名稱" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Promotion.Description" Label="說明" Lines="2"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="PromotionType" @bind-Value="Promotion.Type" Label="促銷類型"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem Value="PromotionType.Discount">折扣</MudSelectItem>
+                        <MudSelectItem Value="PromotionType.AmountOff">滿額折</MudSelectItem>
+                        <MudSelectItem Value="PromotionType.BuyXGetY">買X送Y</MudSelectItem>
+                        <MudSelectItem Value="PromotionType.Bundle">組合價</MudSelectItem>
+                        <MudSelectItem Value="PromotionType.MemberOnly">會員專屬</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="Promotion.DiscountValue" Label="折扣值"
+                                     Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="Promotion.MinimumAmount" Label="最低消費金額"
+                                     Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="Promotion.MinimumQuantity" Label="最低購買數量"
+                                     Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker @bind-Date="_startDate" Label="開始日期" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker @bind-Date="_endDate" Label="結束日期" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int?" @bind-Value="Promotion.StoreId" Label="適用門市" Variant="Variant.Outlined"
+                               Clearable="true">
+                        @foreach (var store in _stores)
+                        {
+                            <MudSelectItem Value="@((int?)store.Id)">@store.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int?" @bind-Value="Promotion.CustomerLevelId" Label="適用會員等級"
+                               Variant="Variant.Outlined" Clearable="true">
+                        @foreach (var level in _customerLevels)
+                        {
+                            <MudSelectItem Value="@((int?)level.Id)">@level.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="Promotion.UsageLimit" Label="使用次數限制"
+                                     Variant="Variant.Outlined" HelperText="留空表示無限制" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudCheckBox T="bool" @bind-Value="Promotion.IsActive" Label="啟用" Class="mt-3" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@(!_isValid)">
+            @(IsNew ? "新增" : "儲存")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public Promotion Promotion { get; set; } = new();
+
+    [Parameter]
+    public bool IsNew { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private List<Store> _stores = new();
+    private List<CustomerLevel> _customerLevels = new();
+    private DateTime? _startDate;
+    private DateTime? _endDate;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _stores = await StoreService.GetAllAsync();
+        _customerLevels = await CustomerLevelService.GetAllAsync();
+        _startDate = Promotion.StartDate;
+        _endDate = Promotion.EndDate;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        Promotion.StartDate = _startDate ?? DateTime.Today;
+        Promotion.EndDate = _endDate ?? DateTime.Today.AddMonths(1);
+
+        if (IsNew)
+        {
+            await PromotionService.CreateAsync(Promotion);
+        }
+        else
+        {
+            await PromotionService.UpdateAsync(Promotion);
+        }
+
+        MudDialog.Close(DialogResult.Ok(Promotion));
+    }
+}

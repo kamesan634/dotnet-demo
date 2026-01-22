@@ -1,8 +1,8 @@
 @page "/audit-logs"
 @attribute [Authorize(Roles = "Admin")]
-@using Microsoft.EntityFrameworkCore
-@using DotnetDemo.Data
-@inject ApplicationDbContext DbContext
+@using DotnetDemo.Services.Interfaces
+@inject IAuditLogService AuditLogService
+@inject IDialogService DialogService
 
 <PageTitle>操作紀錄 - 零售管理系統</PageTitle>
 
@@ -84,34 +84,13 @@
     private async Task SearchAsync()
     {
         _loading = true;
-
-        var query = DbContext.AuditLogs.AsQueryable();
-
-        if (!string.IsNullOrEmpty(_searchUser))
-        {
-            query = query.Where(l => l.UserName != null && l.UserName.Contains(_searchUser));
-        }
-
-        if (!string.IsNullOrEmpty(_searchAction))
-        {
-            query = query.Where(l => l.Action == _searchAction);
-        }
-
-        if (_dateRange.Start.HasValue)
-        {
-            query = query.Where(l => l.CreatedAt >= _dateRange.Start.Value);
-        }
-
-        if (_dateRange.End.HasValue)
-        {
-            query = query.Where(l => l.CreatedAt <= _dateRange.End.Value.AddDays(1));
-        }
-
-        _logs = await query
-            .OrderByDescending(l => l.CreatedAt)
-            .Take(500)
-            .ToListAsync();
-
+        _logs = await AuditLogService.SearchAsync(
+            null,
+            _searchAction,
+            null,
+            _dateRange.Start,
+            _dateRange.End,
+            500);
         _loading = false;
     }
 
@@ -135,8 +114,14 @@
         _ => action
     };
 
-    private void ShowDetails(AuditLog log)
+    private async Task ShowDetails(AuditLog log)
     {
-        // 顯示詳細資訊 Dialog
+        var parameters = new DialogParameters
+        {
+            { "Log", log }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        await DialogService.ShowAsync<AuditLogDetailDialog>("操作紀錄詳情", parameters, options);
     }
 }

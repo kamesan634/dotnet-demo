@@ -1,0 +1,198 @@
+@page "/promotions"
+@attribute [Authorize(Roles = "Admin,Manager")]
+@using DotnetDemo.Services.Interfaces
+@inject IPromotionService PromotionService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>促銷活動 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">促銷活動</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudGrid>
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_searchKeyword" Label="關鍵字搜尋" Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                                  Immediate="true" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudSelect T="bool?" @bind-Value="_filterActive" Label="狀態" Variant="Variant.Outlined" Clearable="true">
+                        <MudSelectItem T="bool?" Value="true">啟用</MudSelectItem>
+                        <MudSelectItem T="bool?" Value="false">停用</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SearchAsync"
+                               StartIcon="@Icons.Material.Filled.Search" Class="mt-1">搜尋</MudButton>
+                </MudItem>
+            </MudGrid>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAddDialog">
+                新增促銷
+            </MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_promotions" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>代碼</MudTh>
+                <MudTh>名稱</MudTh>
+                <MudTh>類型</MudTh>
+                <MudTh>折扣值</MudTh>
+                <MudTh>期間</MudTh>
+                <MudTh>使用次數</MudTh>
+                <MudTh>狀態</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Code</MudTd>
+                <MudTd>@context.Name</MudTd>
+                <MudTd>@GetTypeName(context.Type)</MudTd>
+                <MudTd>@FormatDiscountValue(context)</MudTd>
+                <MudTd>@context.StartDate.ToString("yyyy/MM/dd") ~ @context.EndDate.ToString("yyyy/MM/dd")</MudTd>
+                <MudTd>
+                    @context.UsageCount
+                    @if (context.UsageLimit.HasValue)
+                    {
+                        <span> / @context.UsageLimit</span>
+                    }
+                </MudTd>
+                <MudTd>
+                    <MudChip Size="Size.Small" Color="@GetStatusColor(context)">
+                        @GetStatusText(context)
+                    </MudChip>
+                </MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => OpenEditDialog(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="@(() => Delete(context))" />
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText>尚無促銷活動</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<Promotion> _promotions = new();
+    private bool _loading = true;
+    private string? _searchKeyword;
+    private bool? _filterActive;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        _loading = true;
+        _promotions = await PromotionService.SearchAsync(_searchKeyword, _filterActive, null);
+        _loading = false;
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "Promotion", new Promotion { IsActive = true, StartDate = DateTime.Today, EndDate = DateTime.Today.AddMonths(1) } },
+            { "IsNew", true }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<PromotionDialog>("新增促銷活動", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await SearchAsync();
+            Snackbar.Add("促銷活動已新增", Severity.Success);
+        }
+    }
+
+    private async Task OpenEditDialog(Promotion promotion)
+    {
+        var fullPromotion = await PromotionService.GetByIdAsync(promotion.Id);
+        if (fullPromotion == null) return;
+
+        var parameters = new DialogParameters
+        {
+            { "Promotion", fullPromotion },
+            { "IsNew", false }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<PromotionDialog>("編輯促銷活動", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await SearchAsync();
+            Snackbar.Add("促銷活動已更新", Severity.Success);
+        }
+    }
+
+    private async Task Delete(Promotion promotion)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "確認刪除", $"確定要刪除促銷活動「{promotion.Name}」嗎？",
+            yesText: "刪除", cancelText: "取消");
+
+        if (result == true)
+        {
+            var (success, error) = await PromotionService.DeleteAsync(promotion.Id);
+            if (success)
+            {
+                await SearchAsync();
+                Snackbar.Add("促銷活動已刪除", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add($"刪除失敗：{error}", Severity.Error);
+            }
+        }
+    }
+
+    private string GetTypeName(PromotionType type) => type switch
+    {
+        PromotionType.Discount => "折扣",
+        PromotionType.AmountOff => "滿額折",
+        PromotionType.BuyXGetY => "買X送Y",
+        PromotionType.Bundle => "組合價",
+        PromotionType.MemberOnly => "會員專屬",
+        _ => "未知"
+    };
+
+    private string FormatDiscountValue(Promotion p) => p.Type switch
+    {
+        PromotionType.Discount => $"{p.DiscountValue}% off",
+        PromotionType.AmountOff => $"滿 {p.MinimumAmount} 折 {p.DiscountValue:C0}",
+        _ => p.DiscountValue.ToString("C0")
+    };
+
+    private Color GetStatusColor(Promotion p)
+    {
+        if (!p.IsActive) return Color.Default;
+        var now = DateTime.Now;
+        if (now < p.StartDate) return Color.Info;
+        if (now > p.EndDate) return Color.Default;
+        return Color.Success;
+    }
+
+    private string GetStatusText(Promotion p)
+    {
+        if (!p.IsActive) return "停用";
+        var now = DateTime.Now;
+        if (now < p.StartDate) return "尚未開始";
+        if (now > p.EndDate) return "已結束";
+        return "進行中";
+    }
+}

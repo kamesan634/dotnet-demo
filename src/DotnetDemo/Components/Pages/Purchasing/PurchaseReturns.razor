@@ -1,0 +1,245 @@
+@page "/purchase-returns"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Identity
+@using DotnetDemo.Services.Interfaces
+@inject IPurchaseReturnService PurchaseReturnService
+@inject ISupplierService SupplierService
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>採購退貨 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">採購退貨</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudGrid>
+                <MudItem xs="12" sm="3">
+                    <MudSelect T="int?" @bind-Value="_filterSupplierId" Label="供應商" Variant="Variant.Outlined" Clearable="true">
+                        @foreach (var supplier in _suppliers)
+                        {
+                            <MudSelectItem T="int?" Value="@supplier.Id">@supplier.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudSelect T="PurchaseReturnStatus?" @bind-Value="_filterStatus" Label="狀態" Variant="Variant.Outlined" Clearable="true">
+                        <MudSelectItem T="PurchaseReturnStatus?" Value="PurchaseReturnStatus.Pending">待處理</MudSelectItem>
+                        <MudSelectItem T="PurchaseReturnStatus?" Value="PurchaseReturnStatus.Confirmed">已確認</MudSelectItem>
+                        <MudSelectItem T="PurchaseReturnStatus?" Value="PurchaseReturnStatus.Returned">已退貨</MudSelectItem>
+                        <MudSelectItem T="PurchaseReturnStatus?" Value="PurchaseReturnStatus.Cancelled">已取消</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudDateRangePicker @bind-DateRange="_dateRange" Label="日期範圍" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SearchAsync"
+                               StartIcon="@Icons.Material.Filled.Search" Class="mt-1">搜尋</MudButton>
+                </MudItem>
+            </MudGrid>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAddDialog">
+                新增退貨單
+            </MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_returns" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>退貨單號</MudTh>
+                <MudTh>供應商</MudTh>
+                <MudTh>倉庫</MudTh>
+                <MudTh>退貨原因</MudTh>
+                <MudTh>退貨金額</MudTh>
+                <MudTh>狀態</MudTh>
+                <MudTh>建立時間</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.ReturnNumber</MudTd>
+                <MudTd>@context.Supplier?.Name</MudTd>
+                <MudTd>@context.Warehouse?.Name</MudTd>
+                <MudTd>@context.Reason</MudTd>
+                <MudTd>@context.TotalAmount.ToString("C0")</MudTd>
+                <MudTd>
+                    <MudChip Size="Size.Small" Color="@GetStatusColor(context.Status)">
+                        @GetStatusText(context.Status)
+                    </MudChip>
+                </MudTd>
+                <MudTd>@context.CreatedAt.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => ViewDetails(context))" Title="查看詳情" />
+                    @if (context.Status == PurchaseReturnStatus.Pending)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success"
+                                       OnClick="@(() => Confirm(context))" Title="確認退貨" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" Color="Color.Error"
+                                       OnClick="@(() => Cancel(context))" Title="取消" />
+                    }
+                    @if (context.Status == PurchaseReturnStatus.Confirmed)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Done" Size="Size.Small" Color="Color.Success"
+                                       OnClick="@(() => Complete(context))" Title="完成退貨" />
+                    }
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText>尚無退貨單資料</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<PurchaseReturn> _returns = new();
+    private List<Supplier> _suppliers = new();
+    private bool _loading = true;
+    private int? _filterSupplierId;
+    private PurchaseReturnStatus? _filterStatus;
+    private DateRange _dateRange = new(DateTime.Today.AddDays(-30), DateTime.Today);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _suppliers = await SupplierService.GetAllAsync();
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        _loading = true;
+        _returns = await PurchaseReturnService.SearchAsync(
+            _filterSupplierId, _filterStatus,
+            _dateRange.Start, _dateRange.End?.AddDays(1));
+        _loading = false;
+    }
+
+    private async Task<int> GetCurrentUserId()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(authState.User);
+        return user?.Id ?? 0;
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<PurchaseReturnDialog>("新增退貨單", null, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await SearchAsync();
+            Snackbar.Add("退貨單已建立", Severity.Success);
+        }
+    }
+
+    private async Task ViewDetails(PurchaseReturn purchaseReturn)
+    {
+        var fullReturn = await PurchaseReturnService.GetByIdAsync(purchaseReturn.Id);
+        if (fullReturn == null) return;
+
+        var itemDetails = string.Join("\n", fullReturn.Items.Select(i =>
+            $"  - {i.Product?.Name}: {i.Quantity} x {i.UnitPrice:C0} = {i.SubTotal:C0}"));
+
+        var message = $"退貨單號：{fullReturn.ReturnNumber}\n" +
+                      $"供應商：{fullReturn.Supplier?.Name}\n" +
+                      $"倉庫：{fullReturn.Warehouse?.Name}\n" +
+                      $"退貨原因：{fullReturn.Reason}\n" +
+                      $"狀態：{GetStatusText(fullReturn.Status)}\n\n" +
+                      $"退貨明細：\n{itemDetails}\n\n" +
+                      $"退貨總金額：{fullReturn.TotalAmount:C0}";
+
+        await DialogService.ShowMessageBox("退貨單詳情", message, yesText: "關閉");
+    }
+
+    private async Task Confirm(PurchaseReturn purchaseReturn)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "確認退貨", $"確定要確認退貨單「{purchaseReturn.ReturnNumber}」嗎？確認後將扣減庫存。",
+            yesText: "確認", cancelText: "取消");
+
+        if (result == true)
+        {
+            var userId = await GetCurrentUserId();
+            var (success, error) = await PurchaseReturnService.ConfirmAsync(purchaseReturn.Id, userId);
+            if (success)
+            {
+                await SearchAsync();
+                Snackbar.Add("退貨已確認，庫存已扣減", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add($"確認失敗：{error}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task Complete(PurchaseReturn purchaseReturn)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "完成退貨", $"確定要完成退貨單「{purchaseReturn.ReturnNumber}」嗎？",
+            yesText: "確認", cancelText: "取消");
+
+        if (result == true)
+        {
+            var userId = await GetCurrentUserId();
+            var success = await PurchaseReturnService.CompleteAsync(purchaseReturn.Id, userId);
+            if (success)
+            {
+                await SearchAsync();
+                Snackbar.Add("退貨已完成", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("完成失敗", Severity.Error);
+            }
+        }
+    }
+
+    private async Task Cancel(PurchaseReturn purchaseReturn)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "取消退貨", $"確定要取消退貨單「{purchaseReturn.ReturnNumber}」嗎？",
+            yesText: "確認", cancelText: "取消");
+
+        if (result == true)
+        {
+            var userId = await GetCurrentUserId();
+            var (success, error) = await PurchaseReturnService.CancelAsync(purchaseReturn.Id, userId);
+            if (success)
+            {
+                await SearchAsync();
+                Snackbar.Add("退貨已取消", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add($"取消失敗：{error}", Severity.Error);
+            }
+        }
+    }
+
+    private Color GetStatusColor(PurchaseReturnStatus status) => status switch
+    {
+        PurchaseReturnStatus.Pending => Color.Warning,
+        PurchaseReturnStatus.Confirmed => Color.Info,
+        PurchaseReturnStatus.Returned => Color.Success,
+        PurchaseReturnStatus.Cancelled => Color.Error,
+        _ => Color.Default
+    };
+
+    private string GetStatusText(PurchaseReturnStatus status) => status switch
+    {
+        PurchaseReturnStatus.Pending => "待處理",
+        PurchaseReturnStatus.Confirmed => "已確認",
+        PurchaseReturnStatus.Returned => "已退貨",
+        PurchaseReturnStatus.Cancelled => "已取消",
+        _ => "未知"
+    };
+}

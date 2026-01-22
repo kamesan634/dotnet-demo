@@ -1,10 +1,10 @@
 @page "/users"
 @attribute [Authorize(Roles = "Admin")]
 @using Microsoft.AspNetCore.Identity
-@using Microsoft.EntityFrameworkCore
-@using DotnetDemo.Data
-@inject ApplicationDbContext DbContext
+@using DotnetDemo.Services.Interfaces
+@inject IUserService UserService
 @inject UserManager<ApplicationUser> UserManager
+@inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
 <PageTitle>使用者管理 - 零售管理系統</PageTitle>
@@ -17,7 +17,8 @@
             <MudText Typo="Typo.h6">使用者列表</MudText>
         </CardHeaderContent>
         <CardHeaderActions>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd"
+                       OnClick="OpenAddDialog">
                 新增使用者
             </MudButton>
         </CardHeaderActions>
@@ -45,9 +46,10 @@
                 </MudTd>
                 <MudTd>@context.LastLoginAt?.ToString("yyyy-MM-dd HH:mm")</MudTd>
                 <MudTd>
-                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => OpenEditDialog(context))" />
                     <MudIconButton Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Color="Color.Warning"
-                                   OnClick="@(() => ResetPassword(context))" />
+                                   OnClick="@(() => ResetPassword(context))" Title="重設密碼" />
                 </MudTd>
             </RowTemplate>
         </MudTable>
@@ -60,26 +62,75 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
         _loading = true;
-        _users = await DbContext.Users
-            .Include(u => u.Store)
-            .OrderBy(u => u.UserName)
-            .ToListAsync();
+        _users = await UserService.GetAllAsync();
         _loading = false;
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "User", new ApplicationUser { IsActive = true } },
+            { "IsNew", true }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<UserDialog>("新增使用者", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadDataAsync();
+            Snackbar.Add("使用者已新增", Severity.Success);
+        }
+    }
+
+    private async Task OpenEditDialog(ApplicationUser user)
+    {
+        var fullUser = await UserService.GetByIdAsync(user.Id);
+        if (fullUser == null) return;
+
+        var parameters = new DialogParameters
+        {
+            { "User", fullUser },
+            { "IsNew", false }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<UserDialog>("編輯使用者", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadDataAsync();
+            Snackbar.Add("使用者已更新", Severity.Success);
+        }
     }
 
     private async Task ResetPassword(ApplicationUser user)
     {
-        var token = await UserManager.GeneratePasswordResetTokenAsync(user);
-        var result = await UserManager.ResetPasswordAsync(user, token, "password123");
+        var result = await DialogService.ShowMessageBox(
+            "重設密碼",
+            $"確定要將使用者「{user.UserName}」的密碼重設為 password123 嗎？",
+            yesText: "確認", cancelText: "取消");
 
-        if (result.Succeeded)
+        if (result == true)
         {
-            Snackbar.Add($"使用者 {user.UserName} 的密碼已重設為 password123", Severity.Success);
-        }
-        else
-        {
-            Snackbar.Add("密碼重設失敗", Severity.Error);
+            var (success, error) = await UserService.ChangePasswordAsync(user.Id, "password123");
+            if (success)
+            {
+                Snackbar.Add($"使用者 {user.UserName} 的密碼已重設為 password123", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add($"密碼重設失敗：{error}", Severity.Error);
+            }
         }
     }
 }

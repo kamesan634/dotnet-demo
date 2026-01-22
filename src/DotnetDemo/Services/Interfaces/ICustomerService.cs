@@ -41,4 +41,9 @@ public interface ICustomerService
     /// 更新客戶累積消費
     /// </summary>
     Task<bool> UpdateTotalSpentAsync(int id, decimal amount);
+
+    /// <summary>
+    /// 取得啟用中的客戶
+    /// </summary>
+    Task<List<Customer>> GetActiveAsync();
 }

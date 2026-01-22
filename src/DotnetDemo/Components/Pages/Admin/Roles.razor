@@ -1,10 +1,8 @@
 @page "/roles"
 @attribute [Authorize(Roles = "Admin")]
-@using Microsoft.AspNetCore.Identity
-@using Microsoft.EntityFrameworkCore
-@using DotnetDemo.Data
-@inject ApplicationDbContext DbContext
-@inject RoleManager<ApplicationRole> RoleManager
+@using DotnetDemo.Services.Interfaces
+@inject IRoleService RoleService
+@inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
 <PageTitle>角色管理 - 零售管理系統</PageTitle>
@@ -17,7 +15,8 @@
             <MudText Typo="Typo.h6">角色列表</MudText>
         </CardHeaderContent>
         <CardHeaderActions>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAddDialog">
                 新增角色
             </MudButton>
         </CardHeaderActions>
@@ -28,17 +27,29 @@
                 <MudTh>角色名稱</MudTh>
                 <MudTh>說明</MudTh>
                 <MudTh>使用者數</MudTh>
+                <MudTh>系統角色</MudTh>
                 <MudTh>建立時間</MudTh>
                 <MudTh>操作</MudTh>
             </HeaderContent>
             <RowTemplate>
-                <MudTd>@context.Name</MudTd>
-                <MudTd>@context.Description</MudTd>
+                <MudTd>@context.Role.Name</MudTd>
+                <MudTd>@context.Role.Description</MudTd>
                 <MudTd>@context.UserCount</MudTd>
-                <MudTd>@context.CreatedAt.ToString("yyyy-MM-dd")</MudTd>
                 <MudTd>
-                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" />
-                    <MudIconButton Icon="@Icons.Material.Filled.Security" Size="Size.Small" Color="Color.Info" />
+                    @if (context.Role.IsSystemRole)
+                    {
+                        <MudChip Size="Size.Small" Color="Color.Info">系統</MudChip>
+                    }
+                </MudTd>
+                <MudTd>@context.Role.CreatedAt.ToString("yyyy-MM-dd")</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => OpenEditDialog(context.Role))" />
+                    @if (!context.Role.IsSystemRole)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                       OnClick="@(() => DeleteRole(context.Role))" />
+                    }
                 </MudTd>
             </RowTemplate>
         </MudTable>
@@ -51,27 +62,87 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
         _loading = true;
-
-        var roles = await DbContext.Roles.ToListAsync();
-        var userRoles = await DbContext.UserRoles.ToListAsync();
-
-        _roles = roles.Select(r => new RoleViewModel
+        var roles = await RoleService.GetAllAsync();
+        _roles = new List<RoleViewModel>();
+        foreach (var role in roles)
         {
-            Name = r.Name ?? "",
-            Description = r.Description,
-            CreatedAt = r.CreatedAt,
-            UserCount = userRoles.Count(ur => ur.RoleId == r.Id)
-        }).ToList();
-
+            var userCount = await RoleService.GetUserCountAsync(role.Id);
+            _roles.Add(new RoleViewModel { Role = role, UserCount = userCount });
+        }
         _loading = false;
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "Role", new ApplicationRole() },
+            { "IsNew", true }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<RoleDialog>("新增角色", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadDataAsync();
+            Snackbar.Add("角色已新增", Severity.Success);
+        }
+    }
+
+    private async Task OpenEditDialog(ApplicationRole role)
+    {
+        var fullRole = await RoleService.GetByIdAsync(role.Id);
+        if (fullRole == null) return;
+
+        var parameters = new DialogParameters
+        {
+            { "Role", fullRole },
+            { "IsNew", false }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<RoleDialog>("編輯角色", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadDataAsync();
+            Snackbar.Add("角色已更新", Severity.Success);
+        }
+    }
+
+    private async Task DeleteRole(ApplicationRole role)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "確認刪除", $"確定要刪除角色「{role.Name}」嗎？",
+            yesText: "刪除", cancelText: "取消");
+
+        if (result == true)
+        {
+            var (success, error) = await RoleService.DeleteAsync(role.Id);
+            if (success)
+            {
+                await LoadDataAsync();
+                Snackbar.Add("角色已刪除", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add($"刪除失敗：{error}", Severity.Error);
+            }
+        }
     }
 
     private class RoleViewModel
     {
-        public string Name { get; set; } = string.Empty;
-        public string? Description { get; set; }
-        public DateTime CreatedAt { get; set; }
+        public ApplicationRole Role { get; set; } = new();
         public int UserCount { get; set; }
     }
 }

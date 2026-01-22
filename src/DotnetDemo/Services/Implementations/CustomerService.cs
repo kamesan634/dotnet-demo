@@ -110,4 +110,13 @@ public class CustomerService : ICustomerService
         _logger.LogInformation("客戶 {Id} 累積消費更新: {Amount}", id, amount);
         return true;
     }
+
+    /// <inheritdoc />
+    public async Task<List<Customer>> GetActiveAsync()
+    {
+        return await _context.Customers
+            .Where(c => c.IsActive)
+            .OrderBy(c => c.Name)
+            .ToListAsync();
+    }
 }

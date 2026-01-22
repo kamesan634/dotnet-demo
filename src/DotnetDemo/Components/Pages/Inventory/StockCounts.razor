@@ -1,0 +1,271 @@
+@page "/stock-counts"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Identity
+@using DotnetDemo.Services.Interfaces
+@inject IStockCountService StockCountService
+@inject IWarehouseService WarehouseService
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>庫存盤點 - 零售管理系統</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">庫存盤點</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudGrid>
+                <MudItem xs="12" sm="3">
+                    <MudSelect T="int?" @bind-Value="_filterWarehouseId" Label="倉庫" Variant="Variant.Outlined" Clearable="true">
+                        @foreach (var wh in _warehouses)
+                        {
+                            <MudSelectItem T="int?" Value="@wh.Id">@wh.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudSelect T="StockCountStatus?" @bind-Value="_filterStatus" Label="狀態" Variant="Variant.Outlined" Clearable="true">
+                        <MudSelectItem T="StockCountStatus?" Value="StockCountStatus.Draft">草稿</MudSelectItem>
+                        <MudSelectItem T="StockCountStatus?" Value="StockCountStatus.InProgress">進行中</MudSelectItem>
+                        <MudSelectItem T="StockCountStatus?" Value="StockCountStatus.Completed">已完成</MudSelectItem>
+                        <MudSelectItem T="StockCountStatus?" Value="StockCountStatus.Cancelled">已取消</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudDateRangePicker @bind-DateRange="_dateRange" Label="日期範圍" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SearchAsync"
+                               StartIcon="@Icons.Material.Filled.Search" Class="mt-1">搜尋</MudButton>
+                </MudItem>
+            </MudGrid>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAddDialog">
+                新增盤點單
+            </MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@_stockCounts" Dense="true" Hover="true" Loading="@_loading">
+            <HeaderContent>
+                <MudTh>盤點單號</MudTh>
+                <MudTh>倉庫</MudTh>
+                <MudTh>盤點日期</MudTh>
+                <MudTh>狀態</MudTh>
+                <MudTh>盤盈</MudTh>
+                <MudTh>盤虧</MudTh>
+                <MudTh>建立時間</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.CountNumber</MudTd>
+                <MudTd>@context.Warehouse?.Name</MudTd>
+                <MudTd>@context.CountDate.ToString("yyyy-MM-dd")</MudTd>
+                <MudTd>
+                    <MudChip Size="Size.Small" Color="@GetStatusColor(context.Status)">
+                        @GetStatusText(context.Status)
+                    </MudChip>
+                </MudTd>
+                <MudTd>@context.TotalSurplus</MudTd>
+                <MudTd>@context.TotalShortage</MudTd>
+                <MudTd>@context.CreatedAt.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => ViewDetails(context))" Title="查看詳情" />
+                    @if (context.Status == StockCountStatus.Draft)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.PlayArrow" Size="Size.Small" Color="Color.Info"
+                                       OnClick="@(() => StartCount(context))" Title="開始盤點" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" Color="Color.Error"
+                                       OnClick="@(() => Cancel(context))" Title="取消" />
+                    }
+                    @if (context.Status == StockCountStatus.InProgress)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                       OnClick="@(() => EditCount(context))" Title="編輯盤點" />
+                        <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success"
+                                       OnClick="@(() => Complete(context))" Title="完成盤點" />
+                    }
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText>尚無盤點單資料</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<StockCount> _stockCounts = new();
+    private List<Warehouse> _warehouses = new();
+    private bool _loading = true;
+    private int? _filterWarehouseId;
+    private StockCountStatus? _filterStatus;
+    private DateRange _dateRange = new(DateTime.Today.AddDays(-30), DateTime.Today);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _warehouses = await WarehouseService.GetAllAsync();
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        _loading = true;
+        _stockCounts = await StockCountService.SearchAsync(
+            _filterWarehouseId, _filterStatus,
+            _dateRange.Start, _dateRange.End?.AddDays(1));
+        _loading = false;
+    }
+
+    private async Task<int> GetCurrentUserId()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(authState.User);
+        return user?.Id ?? 0;
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "Warehouses", _warehouses }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<StockCountDialog>("新增盤點單", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await SearchAsync();
+            Snackbar.Add("盤點單已建立", Severity.Success);
+        }
+    }
+
+    private async Task StartCount(StockCount stockCount)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "開始盤點", $"確定要開始盤點「{stockCount.CountNumber}」嗎？系統將依據倉庫現有庫存初始化盤點清單。",
+            yesText: "確認", cancelText: "取消");
+
+        if (result == true)
+        {
+            var success = await StockCountService.InitializeItemsAsync(stockCount.Id);
+            if (success)
+            {
+                await SearchAsync();
+                Snackbar.Add("盤點已開始", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("無法開始盤點", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ViewDetails(StockCount stockCount)
+    {
+        var fullCount = await StockCountService.GetByIdAsync(stockCount.Id);
+        if (fullCount == null) return;
+
+        var message = $"盤點單號：{fullCount.CountNumber}\n" +
+                      $"倉庫：{fullCount.Warehouse?.Name}\n" +
+                      $"盤點日期：{fullCount.CountDate:yyyy-MM-dd}\n" +
+                      $"狀態：{GetStatusText(fullCount.Status)}\n" +
+                      $"範圍說明：{fullCount.Scope ?? "-"}\n\n" +
+                      $"商品項數：{fullCount.Items.Count}\n" +
+                      $"已盤點：{fullCount.Items.Count(i => i.IsCounted)}\n" +
+                      $"盤盈數量：{fullCount.TotalSurplus}\n" +
+                      $"盤虧數量：{fullCount.TotalShortage}";
+
+        await DialogService.ShowMessageBox("盤點單詳情", message, yesText: "關閉");
+    }
+
+    private async Task EditCount(StockCount stockCount)
+    {
+        var fullCount = await StockCountService.GetByIdAsync(stockCount.Id);
+        if (fullCount == null) return;
+
+        var parameters = new DialogParameters
+        {
+            { "StockCount", fullCount }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<StockCountEditDialog>("編輯盤點", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await SearchAsync();
+            Snackbar.Add("盤點資料已更新", Severity.Success);
+        }
+    }
+
+    private async Task Complete(StockCount stockCount)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "完成盤點", $"確定要完成盤點「{stockCount.CountNumber}」嗎？系統將依據盤點結果調整庫存。",
+            yesText: "確認", cancelText: "取消");
+
+        if (result == true)
+        {
+            var userId = await GetCurrentUserId();
+            var (success, error) = await StockCountService.CompleteAsync(stockCount.Id, userId);
+            if (success)
+            {
+                await SearchAsync();
+                Snackbar.Add("盤點已完成，庫存已調整", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add($"完成失敗：{error}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task Cancel(StockCount stockCount)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "取消盤點", $"確定要取消盤點「{stockCount.CountNumber}」嗎？",
+            yesText: "確認", cancelText: "取消");
+
+        if (result == true)
+        {
+            var userId = await GetCurrentUserId();
+            var success = await StockCountService.CancelAsync(stockCount.Id, userId);
+            if (success)
+            {
+                await SearchAsync();
+                Snackbar.Add("盤點已取消", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("取消失敗", Severity.Error);
+            }
+        }
+    }
+
+    private Color GetStatusColor(StockCountStatus status) => status switch
+    {
+        StockCountStatus.Draft => Color.Default,
+        StockCountStatus.InProgress => Color.Info,
+        StockCountStatus.Completed => Color.Success,
+        StockCountStatus.Cancelled => Color.Error,
+        _ => Color.Default
+    };
+
+    private string GetStatusText(StockCountStatus status) => status switch
+    {
+        StockCountStatus.Draft => "草稿",
+        StockCountStatus.InProgress => "進行中",
+        StockCountStatus.Completed => "已完成",
+        StockCountStatus.Cancelled => "已取消",
+        _ => "未知"
+    };
+}

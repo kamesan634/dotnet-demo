@@ -63,7 +63,7 @@ jobs:
           ConnectionStrings__Redis: "localhost:6379"
 
       - name: Publish application
-        run: dotnet publish src/DotnetDemo.Web/DotnetDemo.Web.csproj --no-build --configuration Release --output ./publish
+        run: dotnet publish src/DotnetDemo/DotnetDemo.csproj --no-build --configuration Release --output ./publish
 
       - name: Upload test results
         uses: actions/upload-artifact@v4

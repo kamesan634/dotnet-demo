@@ -1,8 +1,15 @@
 @page "/pos"
 @attribute [Authorize]
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Identity
 @using DotnetDemo.Data
+@using DotnetDemo.Services.Interfaces
 @inject ApplicationDbContext DbContext
+@inject IOrderService OrderService
+@inject IProductService ProductService
+@inject ICustomerService CustomerService
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
 @inject ISnackbar Snackbar
 
 <PageTitle>POS 銷售 - 零售管理系統</PageTitle>
@@ -80,6 +87,13 @@
                     }
                 </MudSelect>
 
+                <MudSelect T="int" @bind-Value="_selectedWarehouseId" Label="出貨倉庫" Variant="Variant.Outlined" Class="mb-4">
+                    @foreach (var wh in _warehouses)
+                    {
+                        <MudSelectItem Value="@wh.Id">@wh.Name</MudSelectItem>
+                    }
+                </MudSelect>
+
                 <MudSelect T="int" @bind-Value="_selectedPaymentMethodId" Label="付款方式" Variant="Variant.Outlined" Class="mb-4">
                     @foreach (var pm in _paymentMethods)
                     {
@@ -103,16 +117,31 @@
     private List<CartItem> _cartItems = new();
     private List<Customer> _customers = new();
     private List<PaymentMethod> _paymentMethods = new();
+    private List<Warehouse> _warehouses = new();
     private int? _selectedCustomerId;
     private int _selectedPaymentMethodId;
+    private int _selectedWarehouseId;
+    private int _currentUserId;
 
     protected override async Task OnInitializedAsync()
     {
-        _customers = await DbContext.Customers.Where(c => c.IsActive).OrderBy(c => c.Name).ToListAsync();
+        // 取得目前使用者
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(authState.User);
+        _currentUserId = user?.Id ?? 0;
+
+        // 使用服務層取得資料
+        _customers = await CustomerService.GetActiveAsync();
         _paymentMethods = await DbContext.PaymentMethods.Where(p => p.IsActive).OrderBy(p => p.SortOrder).ToListAsync();
+        _warehouses = await DbContext.Warehouses.Where(w => w.IsActive).OrderBy(w => w.Name).ToListAsync();
+
         if (_paymentMethods.Any())
         {
             _selectedPaymentMethodId = _paymentMethods.First().Id;
+        }
+        if (_warehouses.Any())
+        {
+            _selectedWarehouseId = _warehouses.First().Id;
         }
     }
 
@@ -121,10 +150,8 @@
         if (string.IsNullOrWhiteSpace(value))
             return Enumerable.Empty<Product>();
 
-        return await DbContext.Products
-            .Where(p => p.IsActive && (p.Name.Contains(value) || p.Barcode!.Contains(value)))
-            .Take(10)
-            .ToListAsync();
+        // 使用服務層搜尋商品
+        return await ProductService.SearchForPosAsync(value, 10);
     }
 
     private void AddToCart()
@@ -143,6 +170,7 @@
                 ProductId = _selectedProduct.Id,
                 ProductName = _selectedProduct.Name,
                 UnitPrice = _selectedProduct.SellingPrice,
+                CostPrice = _selectedProduct.CostPrice,
                 Quantity = _quantity
             });
         }
@@ -164,19 +192,26 @@
             return;
         }
 
+        if (_selectedWarehouseId == 0)
+        {
+            Snackbar.Add("請選擇出貨倉庫", Severity.Warning);
+            return;
+        }
+
         try
         {
+            // 建立訂單並扣減庫存 - 使用服務層
             var order = new Order
             {
-                OrderNumber = $"POS{DateTime.Now:yyyyMMddHHmmss}",
                 CustomerId = _selectedCustomerId,
-                TotalAmount = _cartItems.Sum(x => x.Subtotal),
+                StoreId = 1, // 預設門市
                 Status = OrderStatus.Completed,
                 Items = _cartItems.Select(x => new OrderItem
                 {
                     ProductId = x.ProductId,
                     Quantity = x.Quantity,
-                    UnitPrice = x.UnitPrice
+                    UnitPrice = x.UnitPrice,
+                    CostPrice = x.CostPrice
                 }).ToList(),
                 Payments = new List<OrderPayment>
                 {
@@ -188,12 +223,18 @@
                 }
             };
 
-            DbContext.Orders.Add(order);
-            await DbContext.SaveChangesAsync();
+            // 使用服務層建立訂單並扣減庫存
+            await OrderService.CreateWithInventoryDeductionAsync(order, _selectedWarehouseId, _currentUserId);
+
+            // 更新客戶累積消費
+            if (_selectedCustomerId.HasValue)
+            {
+                await CustomerService.UpdateTotalSpentAsync(_selectedCustomerId.Value, order.TotalAmount);
+            }
 
             _cartItems.Clear();
             _selectedCustomerId = null;
-            Snackbar.Add("結帳成功！", Severity.Success);
+            Snackbar.Add($"結帳成功！訂單編號：{order.OrderNumber}", Severity.Success);
         }
         catch (Exception ex)
         {
@@ -206,6 +247,7 @@
         public int ProductId { get; set; }
         public string ProductName { get; set; } = string.Empty;
         public decimal UnitPrice { get; set; }
+        public decimal CostPrice { get; set; }
         public int Quantity { get; set; }
         public decimal Subtotal => UnitPrice * Quantity;
     }
