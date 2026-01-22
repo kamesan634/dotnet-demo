@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using DotnetDemo.Data;
 using DotnetDemo.Models.Entities;
 
@@ -16,6 +17,7 @@ public static class MockDbContextFactory
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options;
 
         return new ApplicationDbContext(options);
@@ -93,7 +95,8 @@ public static class MockDbContextFactory
         // 倉庫
         var warehouses = new[]
         {
-            new Warehouse { Id = 1, Code = "W001", Name = "測試倉庫", StoreId = 1, IsPrimary = true, IsActive = true }
+            new Warehouse { Id = 1, Code = "W001", Name = "測試倉庫", StoreId = 1, IsPrimary = true, IsActive = true },
+            new Warehouse { Id = 2, Code = "W002", Name = "測試倉庫2", StoreId = 1, IsPrimary = false, IsActive = true }
         };
         context.Warehouses.AddRange(warehouses);
 
