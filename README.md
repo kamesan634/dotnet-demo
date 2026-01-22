@@ -1,4 +1,6 @@
-# 零售管理系統 (Retail Management System)
+#  龜三的ERP Demo (Retail Management System)
+
+![CI](https://github.com/kamesan634/dotnet-demo/actions/workflows/ci.yml/badge.svg)
 
 一個使用 ASP.NET Core 8.0 + Blazor Server 建構的現代化零售管理系統，提供完整的 POS 銷售、庫存管理、採購管理等功能。
 
